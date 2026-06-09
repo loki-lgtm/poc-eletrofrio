@@ -184,3 +184,7 @@ Dashboard Temperatura em operação normal
 ---
 ![Dashboard](./assets/dashboard2.png)
 Dashboard Temperatura critica
+
+
+
+Fazendo um teste para envio.
