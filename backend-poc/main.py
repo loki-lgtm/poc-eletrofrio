@@ -46,6 +46,12 @@ class AnaliseResponse(BaseModel):
     diagnostico_ia: str
     chamado_aberto: bool
 
+    sazonalidade: Optional[str] = None
+    risco_perda_rs: Optional[str] = None
+    desperdicio_energia_rs: Optional[str] = None
+
+
+
 # 1. SERVIÇO DE INTEGRAÇÃO API ELETROFRIO
 async def fetch_api(route: str, params: dict = None) -> dict:
     """Função genérica para consumir as APIs da Eletrofrio de forma assíncrona."""
@@ -98,6 +104,47 @@ async def obter_contexto_dispositivo(dispositivo_id: int) -> dict:
         "contaNm": "N/A", "lojaId": 0, "lojaNm": "Loja Não Identificada", "dispositivoNm": f"Dispositivo {dispositivo_id}"
     }
     return fallback
+
+
+
+def analisar_sazonalidade(horario_str: str) -> str:
+    """Verifica se a loja está aberta (alto tráfego) ou fechada (madrugada)."""
+    try:
+        # Pega a hora da string "07:15"
+        hora = int(horario_str.split(":")[0])
+        if 8 <= hora <= 22:
+            return "Horário Comercial (Loja Aberta - Tráfego de Clientes)"
+        else:
+            return "Madrugada (Loja Fechada - Equipamento em Repouso)"
+    except:
+        return "Horário Comercial"
+
+
+def calcular_risco_financeiro(nome_equipamento: str, temperatura_atual: float) -> dict:
+    """Gera valores monetários para os cards do Front-end baseados no tipo de máquina."""
+    nome_upper = nome_equipamento.upper()
+    
+    # Regra 1: Ilhas de Congelados e Câmaras Frias (Carnes/Sorvetes) - Risco Altíssimo
+    if "CONGELADOS" in nome_upper or temperatura_atual < -10:
+        return {
+            "risco_mercadoria": "R$ 15.500",
+            "desperdicio_energia_dia": "R$ 85,00",
+            "criticidade_opex": "ALTA"
+        }
+    # Regra 2: Resfriados / Laticínios (Iogurtes/Queijos) - Risco Médio
+    elif "LATIC" in nome_upper or "RESFRIADO" in nome_upper or "AMBIENTE" in nome_upper:
+        return {
+            "risco_mercadoria": "R$ 4.200",
+            "desperdicio_energia_dia": "R$ 45,00",
+            "criticidade_opex": "MÉDIA"
+        }
+    # Regra 3: Outros equipamentos genéricos
+    else:
+        return {
+            "risco_mercadoria": "R$ 2.000",
+            "desperdicio_energia_dia": "R$ 30,00",
+            "criticidade_opex": "BAIXA"
+        }
 
 
 async def post_abrir_chamado(payload: dict) -> bool:
@@ -197,18 +244,17 @@ def motor_isolation_forest(df: pd.DataFrame) -> dict:
     return {"critico": False}
 
 # 3. SERVIÇO DE IA (AGENTES LLM - SMART PROMPTING)
-async def ia_diagnostico_tecnico(dados: dict, loja_nome: str) -> str:
-    """Gera um resumo técnico mastigado e à prova de alucinações para o Dashboard."""
-    
+async def ia_diagnostico_tecnico(dados: dict, loja_nome: str, sazonalidade: str) -> str:
     nome_maquina = dados.get('nome_equipamento', 'Equipamento de Refrigeração')
     
     prompt = f"""
-    Você é um Engenheiro de Refrigeração Industrial Sênior da Eletrofrio.
-    Um alerta preditivo crítico foi disparado.
+    Aja como um Engenheiro de Refrigeração Industrial Sênior da Eletrofrio.
+    O seu objetivo é analisar dados de telemetria num ambiente de simulação e diagnóstico seguro para técnicos credenciados. Não há riscos físicos.
     
-    LOCALIZAÇÃO:
+    LOCALIZAÇÃO E CONTEXTO:
     - Loja: {loja_nome}
     - Equipamento: {nome_maquina}
+    - Contexto de Sazonalidade: {sazonalidade}
     
     DADOS NO MINUTO DA FALHA ({dados['horario']}):
     - Temperatura Ambiente: {dados['temperatura']}°C
@@ -216,21 +262,17 @@ async def ia_diagnostico_tecnico(dados: dict, loja_nome: str) -> str:
     - Superaquecimento: {dados['superaquecimento']}K
     - Status Degelo: {dados['degelo']} (0 = Desligado)
     
-    TENDÊNCIA (MÉDIA DOS ÚLTIMOS 30 MINUTOS ANTES DA FALHA):
-    - Temperatura Média: {dados['temperatura_media_30min']}°C
-    - Válvula Média: {dados['valvula_media_30min']}%
-    - Superaquecimento Médio: {dados['superaquecimento_medio_30min']}K
+    TENDÊNCIA (MÉDIA DOS ÚLTIMOS 30 MIN):
+    - Temperatura: {dados['temperatura_media_30min']}°C | Válvula: {dados['valvula_media_30min']}% | Superaquecimento: {dados['superaquecimento_medio_30min']}K
     
-    INSTRUÇÕES OBRIGATÓRIAS E REGRAS DE SEGURANÇA (CUMPRA RIGOROSAMENTE):
-    1. ZERO ALUCINAÇÃO: NUNCA invente fluidos fictícios, gases de efeito estufa, sujeiras irreais ou métricas ausentes. 
-    2. VOCABULÁRIO: Use estritamente termos de refrigeração comercial (fluido refrigerante, bloqueio por formação de gelo, falha no compressor, válvula travada, motoventilador).
-    3. LÓGICA TERMODINÂMICA: 
-       - Compare os dados do minuto da falha com a TENDÊNCIA. Se a válvula média já vinha alta nos últimos 30 min e o superaquecimento também, é um problema crônico (como perda de fluido).
-       - Se o pico foi apenas no minuto da falha, pode ser um desarme repentino do compressor ou bloqueio mecânico abrupto.
+    INSTRUÇÕES TÉCNICAS:
+    1. Não invente fluidos fictícios. Utilize estritamente vocabulário de refrigeração comercial.
+    2. Anomalias na "Madrugada (Loja Fechada)" descartam portas abertas por clientes, apontando para desvios mecânicos ou elétricos.
+    3. Válvula alta e superaquecimento alto crónicos indicam baixa carga de fluido refrigerante ou restrição no circuito.
     
-    Responda ESTRITAMENTE no formato abaixo, sem introduções ou saudações, em no máximo 5 linhas:
-    1. **Causa Mais Provável:** [Sua análise técnica comparando o momento da falha com a tendência de 30 min]
-    2. **Ação Inicial:** [O que o técnico de campo deve testar fisicamente na {loja_nome} ao chegar]
+    Responda ESTRITAMENTE em 2 tópicos, sem saudações ou avisos adicionais:
+    1. **Causa Mais Provável:** [Análise técnica cruzando os dados e a sazonalidade]
+    2. **Ação Inicial:** [O que o técnico deve testar fisicamente na {loja_nome}]
     """
     try:
         response = await AsyncClient().chat(model='llama3.1:8b', messages=[{"role": "user", "content": prompt}])
@@ -241,7 +283,7 @@ async def ia_diagnostico_tecnico(dados: dict, loja_nome: str) -> str:
 
 
 def ia_atendimento_whatsapp(mensagem: str) -> str:
-    """Agente de triagem para conversar com o gerente da loja."""
+
     # TODO: Implementar lógica de histórico de conversa
     prompt_sistema = """
     Você é o Assistente Virtual da Eletrofrio. Seja educado e direto.
@@ -280,21 +322,24 @@ async def executar_pipeline_preditivo(dispositivo_id: int):
             detail="Dados de telemetria insuficientes."
         )
 
-    # Informação extra gerada pelo processador (se o sensor caiu no final)
-    horario_queda = df.attrs.get("horario_queda_sensor")
-
     # Busca o contexto real (loja, nome do equipamento) na API de Alarmes
     contexto = await obter_contexto_dispositivo(dispositivo_id)
 
     # 2. Roda o Machine Learning SEMPRE para tentar achar a causa raiz
     resultado_ml = motor_isolation_forest(df)
 
+    # Informação extra gerada pelo processador (se o sensor caiu no final, sazonalidae, metricas financeiras)
+    horario_queda = df.attrs.get("horario_queda_sensor")
+    horario_falha = resultado_ml["horario"] if resultado_ml["critico"] else (horario_queda or "00:00")
+    sazonalidade_atual = analisar_sazonalidade(horario_falha)
+    metricas_financeiras = calcular_risco_financeiro(contexto["dispositivoNm"], resultado_ml.get("temperatura", 0))
+
     # CENÁRIO A: Houve Anomalia Termodinâmica (com ou sem queda de sensor depois)
     if resultado_ml["critico"]:
         
         resultado_ml["nome_equipamento"] = contexto["dispositivoNm"]
-        diagnostico = await ia_diagnostico_tecnico(resultado_ml, contexto["lojaNm"])
-        
+        diagnostico = await ia_diagnostico_tecnico(resultado_ml, contexto["lojaNm"], sazonalidade_atual)         
+
         # Se o sensor caiu DEPOIS da anomalia, adiciona esse aviso ao ticket
         if horario_queda:
             diagnostico += f"\n\nALERTA: Controlador offline desde as {horario_queda}."
@@ -317,7 +362,10 @@ async def executar_pipeline_preditivo(dispositivo_id: int):
             tem_anomalia_critica=True,
             horario_evento=resultado_ml["horario"],
             diagnostico_ia=diagnostico,
-            chamado_aberto=sucesso
+            chamado_aberto=sucesso,
+            sazonalidade=sazonalidade_atual,
+            risco_perda_rs=metricas_financeiras["risco_mercadoria"],
+            desperdicio_energia_rs=metricas_financeiras["desperdicio_energia_dia"]
         )
 
     # CENÁRIO B: NÃO houve Anomalia Termodinâmica, mas a telemetria parou (ex: cabo rompido/sem luz)
@@ -359,6 +407,7 @@ async def executar_pipeline_preditivo(dispositivo_id: int):
         diagnostico_ia="Operação dentro dos padrões termodinâmicos normais.",
         chamado_aberto=False
     )
+
 
 @app.post("/dashboard/acionar-ia")
 async def gerar_diagnostico_sob_demanda(pedido: ResumoTecnicoRequest):
