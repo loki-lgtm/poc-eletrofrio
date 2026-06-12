@@ -1,390 +1,227 @@
 import React, { useState } from 'react';
+import { Icon } from '../components/Icon';
+import { Topbar, PageHead, Kpi, Pill, TipoPill, PrioPill, Modal } from '../components/ui';
+import { Sparkline } from '../components/charts';
+import * as D from '../utils/mockData';
 
-// ─── DADOS MOCKADOS (substituir por API futuramente) ────────────────────────
-const metrics = {
-  equipamentos: { total: 142, ativos: 138, emFalha: 4, emManutencao: 3 },
-  chamados: { total: 27, criticos: 5, urgentes: 8, emAndamento: 11, aguardandoAprovacao: 3 },
-  anomalias: { detectadas: 19, falsosPositivos: 7, falhasReais: 12, isolationForestAlerts: 4 },
-  utilizadores: { total: 34, tecnicos: 18, supervisores: 10, admins: 6 },
-};
-
-const alertasRecentes = [
-  { id: 1, tipo: 'Falha Real',        prioridade: 'Crítica', empresa: 'Supermercado BomPreço',  equipamento: 'Câmara Fria 03', hora: '08:31', status: 'Aberto' },
-  { id: 2, tipo: 'Falha Real',        prioridade: 'Urgente', empresa: 'Rede FrioBom',           equipamento: 'Balcão Frigorífico 01', hora: '09:15', status: 'Em andamento' },
-  { id: 3, tipo: 'Oscilação Normal',  prioridade: 'Normal',  empresa: 'Atacadão Norte',         equipamento: 'Expositor Laticínios', hora: '09:42', status: 'Resolvido' },
-  { id: 4, tipo: 'Em Análise',        prioridade: 'Alta',    empresa: 'Mercado Central',        equipamento: 'Compressor Setor B', hora: '10:05', status: 'Em andamento' },
-  { id: 5, tipo: 'Falha Real',        prioridade: 'Urgente', empresa: 'SuperFrio Ltda',         equipamento: 'Câmara Fria 01', hora: '10:22', status: 'Aberto' },
+const actions = [
+  { icon: 'alert', tone: 'red', tag: 'Crítico', title: 'Anomalias críticas', n: 4,
+    desc: 'equipamentos com score Isolation Forest > 0.85', cta: 'Ver ocorrências' },
+  { icon: 'users', tone: 'amber', tag: 'Urgente', title: 'Chamados sem responsável', n: 5,
+    desc: 'chamados abertos sem técnico atribuído', cta: 'Atribuir técnicos' },
+  { icon: 'wrench', tone: 'purple', tag: 'Atenção', title: 'Manutenções atrasadas', n: 3,
+    desc: 'intervenções preventivas com prazo vencido', cta: 'Agendar' },
 ];
 
-const acoesPrincipais = [
-  {
-    titulo: 'Anomalias Críticas',
-    badge: 'Crítico',
-    badgeClass: 'status-critical',
-    corpo: '4 equipamentos com score Isolation Forest > 0.85',
-    detalhes: [
-      { label: 'Câmara Fria 03 — BomPreço', valor: 'Score 0.91' },
-      { label: 'Compressor Setor B — Central', valor: 'Score 0.87' },
-    ],
-  },
-  {
-    titulo: 'Chamados sem Responsável',
-    badge: 'Urgente',
-    badgeClass: 'status-warning',
-    corpo: '5 chamados abertos sem técnico atribuído',
-    detalhes: [],
-    subtexto: 'Atribua técnicos para evitar SLA vencido.',
-  },
-  {
-    titulo: 'Manutenções Atrasadas',
-    badge: 'Precisa de ação',
-    badgeClass: 'status-warning',
-    corpo: '3 manutenções preventivas com prazo vencido',
-    detalhes: [],
-    subtexto: 'Reagende para evitar degradação dos ativos.',
-  },
-  {
-    titulo: 'Diagnósticos RAG Disponíveis',
-    badge: 'Recomendado',
-    badgeClass: 'status-info',
-    corpo: '7 alertas aguardam diagnóstico humanizado via IA',
-    detalhes: [],
-    subtexto: 'Acione o Especialista IA para análise contextualizada.',
-  },
+const systems = [
+  { name: 'Sistema Galileo (API)', ok: 'Operacional', state: 'green', meta: '99.98% · 142ms' },
+  { name: 'Motor Isolation Forest', ok: 'Operacional', state: 'green', meta: 'lote há 38s' },
+  { name: 'Serviço RAG / LlamaIndex', ok: 'Operacional', state: 'green', meta: '7 em fila' },
+  { name: 'Mensageria (RabbitMQ)', ok: 'Operacional', state: 'green', meta: '1.2k msg/min' },
+  { name: 'Pipeline ETL (Python)', ok: 'Atenção', state: 'amber', meta: 'atraso 4min' },
 ];
 
-// ─── HELPERS ────────────────────────────────────────────────────────────────
-const prioridadeConfig = {
-  'Mínima':  { color: '#aaaaaa', bg: '#1a1a1a' },
-  'Baixa':   { color: '#00cfff', bg: '#001f2e' },
-  'Normal':  { color: '#00ff94', bg: '#001a0f' },
-  'Alta':    { color: '#ffe600', bg: '#1f1a00' },
-  'Urgente': { color: '#ff6a00', bg: '#1f0e00' },
-  'Crítica': { color: '#ff2d55', bg: '#1f0008' },
-};
+export function PaginaInicial({ setTelaAtiva }) {
+  const sp = (seed, color) => <Sparkline data={D.series(seed, 24, 50, 20)} color={color} width={120} height={40} />;
 
-const tipoConfig = {
-  'Falha Real':       { color: '#ff2d55', label: '🔴 Falha Real' },
-  'Em Análise':       { color: '#ffe600', label: '🟡 Em Análise' },
-  'Oscilação Normal': { color: '#00ff94', label: '🟢 Oscilação Normal' },
-};
+  const [modal, setModal] = useState(null);
+  const [semTecnico, setSemTecnico] = useState(() => D.chamados.filter((c) => c.tecnico === '—').slice(0, 5));
+  const [atrasadas, setAtrasadas] = useState(() => D.manutencoes.filter((m) => m.atraso));
 
-function PrioridadeBadge({ nivel }) {
-  const cfg = prioridadeConfig[nivel] || prioridadeConfig['Normal'];
-  return (
-    <span style={{
-      fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px',
-      borderRadius: '4px', background: cfg.bg, color: cfg.color,
-      border: `1px solid ${cfg.color}44`, whiteSpace: 'nowrap',
-      boxShadow: nivel === 'Crítica' ? `0 0 6px ${cfg.color}66` : 'none',
-      animation: nivel === 'Crítica' ? 'glowPulse 1.8s ease-in-out infinite' : 'none',
-    }}>
-      {nivel}
-    </span>
-  );
-}
+  const atribuir = (chamadoId, tecnico) => {
+    setSemTecnico((prev) => prev.map((c) => (c.id === chamadoId ? { ...c, tecnico } : c)));
+  };
+  const confirmarAgendamento = (manutencaoId) => {
+    setAtrasadas((prev) => prev.filter((m) => m.id !== manutencaoId));
+  };
 
-// ─── COMPONENTE PRINCIPAL ───────────────────────────────────────────────────
-export function PaginaInicial() {
-  const [filtroAtivo, setFiltroAtivo] = useState('Anomalias');
-  const filtros = ['Anomalias', 'Chamados', 'Equipamentos', 'Utilizadores', 'Manutenção'];
+  const actionHandlers = [
+    () => setTelaAtiva && setTelaAtiva('ocorrencias'),
+    () => setModal('tecnicos'),
+    () => setModal('manutencao'),
+  ];
 
   return (
-    <div style={{ padding: '24px 28px', color: '#e6edf3', fontFamily: 'system-ui, sans-serif', background: '#0d1117', minHeight: '100vh' }}>
-
-      {/* Keyframes */}
-      <style>{`
-        @keyframes glowPulse {
-          0%,100% { box-shadow: 0 0 4px #ff2d55; }
-          50%      { box-shadow: 0 0 14px #ff2d55, 0 0 28px #ff2d5544; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .pi-card {
-          background: #161b22;
-          border: 1px solid #21262d;
-          border-radius: 10px;
-          padding: 18px;
-          animation: fadeIn 0.4s ease both;
-        }
-        .pi-card:hover { border-color: #30363d; }
-        .pi-btn {
-          background: transparent;
-          border: 1px solid #30363d;
-          color: #c9d1d9;
-          padding: 6px 14px;
-          border-radius: 6px;
-          font-size: 0.8rem;
-          cursor: pointer;
-        }
-        .pi-btn:hover { border-color: #8b949e; color: #fff; }
-        .pi-section-title {
-          font-size: 1rem;
-          font-weight: 600;
-          color: #e6edf3;
-          margin: 28px 0 14px 0;
-          padding-bottom: 8px;
-          border-bottom: 1px solid #21262d;
-        }
-        .pi-pill {
-          padding: 5px 14px;
-          border-radius: 20px;
-          font-size: 0.8rem;
-          border: 1px solid #30363d;
-          background: transparent;
-          color: #8b949e;
-          cursor: pointer;
-        }
-        .pi-pill.active {
-          background: #1f6feb;
-          border-color: #1f6feb;
-          color: #fff;
-        }
-        .pi-badge {
-          font-size: 0.68rem;
-          font-weight: 700;
-          padding: 2px 8px;
-          border-radius: 4px;
-          margin-left: 8px;
-        }
-        .status-critical { background: #3d0c0c; color: #ff2d55; border: 1px solid #ff2d5544; }
-        .status-warning  { background: #2d1f00; color: #ff6a00; border: 1px solid #ff6a0044; }
-        .status-info     { background: #001f2e; color: #00cfff; border: 1px solid #00cfff44; }
-        .status-good     { background: #001a0f; color: #00ff94; border: 1px solid #00ff9444; }
-        .pi-big-num {
-          font-size: 2.4rem;
-          font-weight: 700;
-          color: #ffffff;
-          margin: 8px 0 4px;
-          line-height: 1;
-        }
-        .pi-sub { font-size: 0.78rem; color: #8b949e; margin: 0; }
-        .pi-row { display: flex; gap: 16px; }
-        .pi-grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
-        .pi-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .pi-grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
-        .pi-divider { width: 1px; background: #21262d; margin: 0 8px; }
-        .pi-alert-row {
-          display: grid;
-          grid-template-columns: 1fr 1.4fr 1fr 90px 90px;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 14px;
-          border-radius: 6px;
-          font-size: 0.82rem;
-          border-bottom: 1px solid #21262d;
-        }
-        .pi-alert-row:hover { background: #1c2128; }
-        .pi-alert-row:last-child { border-bottom: none; }
-        .pi-top-bar {
-          display: flex;
-          justify-content: flex-end;
-          margin-bottom: 4px;
-        }
-        .readonly-badge {
-          font-size: 0.72rem;
-          color: #00cfff;
-          border: 1px solid #00cfff33;
-          background: #001f2e;
-          padding: 4px 10px;
-          border-radius: 20px;
-        }
-      `}</style>
-
-      {/* TOP BAR */}
-      <div className="pi-top-bar">
-        <span className="readonly-badge">● MODO LEITURA — IA não controla equipamentos</span>
-      </div>
-
-      {/* ── SESSÃO 1: KPIs PRINCIPAIS ── */}
-      <div className="pi-section-title">Visão geral do sistema</div>
-      <div className="pi-grid-4">
-
-        {/* Card Equipamentos */}
-        <div className="pi-card">
-          <p className="pi-sub">Equipamentos monitorados</p>
-          <div className="pi-big-num">{metrics.equipamentos.total}</div>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Ativos</div><div style={{ fontWeight: 700, color: '#00ff94' }}>{metrics.equipamentos.ativos}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Em Falha</div><div style={{ fontWeight: 700, color: '#ff2d55' }}>{metrics.equipamentos.emFalha}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Manutenção</div><div style={{ fontWeight: 700, color: '#ffe600' }}>{metrics.equipamentos.emManutencao}</div></div>
+    <>
+      <Topbar crumbs={['Eletrofrio', 'Visão geral']}>
+        <div className="field"><Icon name="calendar" />Últimas 24h</div>
+        <button className="btn" onClick={() => window.location.reload()}><Icon name="refresh" />Atualizar</button>
+        <button className="btn primary" onClick={() => setModal('novo')}><Icon name="plus" />Novo chamado</button>
+      </Topbar>
+      <div className="scroll"><div className="page">
+        <PageHead title="Visão geral do sistema"
+          sub="Estado operacional em tempo real · 5 unidades · atualizado há 12 segundos">
+          <div className="row">
+            <span className="pill green" style={{ height: 26 }}><span className="statusdot green pulse" />Online</span>
           </div>
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#8b949e', marginBottom: '4px' }}>
-              <span>Operacionais</span>
-              <span>{metrics.equipamentos.ativos}/{metrics.equipamentos.total}</span>
+        </PageHead>
+
+        {/* KPIs */}
+        <div className="kpis">
+          <Kpi icon="cpu" label="Equipamentos monitorados" value="142"
+            sub={<span className="delta up"><Icon name="arrowUp" size={12} />138 operacionais</span>}
+            spark={sp(1, 'var(--accent)')}
+            foot={[{ value: '138', label: 'Ativos', color: 'var(--green)' },
+              { value: '4', label: 'Em falha', color: 'var(--red)' },
+              { value: '3', label: 'Manut.', color: 'var(--amber)' }]} />
+          <Kpi icon="file" label="Chamados ativos" value="27" accent="--amber"
+            sub={<span className="delta up"><Icon name="arrowUp" size={12} />+12 esta semana</span>}
+            spark={sp(2, 'var(--amber)')}
+            foot={[{ value: '5', label: 'Críticos', color: 'var(--red)' },
+              { value: '11', label: 'Andamento', color: 'var(--amber)' },
+              { value: '3', label: 'Aprovação', color: 'var(--purple)' }]} />
+          <Kpi icon="sparkles" label="Anomalias detectadas (IA)" value="19" accent="--red"
+            sub={<span className="faint">Isolation Forest · LightGBM · RAG</span>}
+            spark={sp(3, 'var(--red)')}
+            foot={[{ value: '12', label: 'Falhas reais', color: 'var(--red)' },
+              { value: '7', label: 'Falsos pos.', color: 'var(--text-dim)' },
+              { value: '4', label: 'Score alto', color: 'var(--amber)' }]} />
+          <Kpi icon="users" label="Utilizadores do sistema" value="34" accent="--cyan"
+            sub={<span className="delta flat">estável</span>}
+            spark={sp(4, 'var(--cyan)')}
+            foot={[{ value: '18', label: 'Técnicos' },
+              { value: '10', label: 'Superv.' },
+              { value: '6', label: 'Admins' }]} />
+        </div>
+
+        {/* priority actions */}
+        <div className="row" style={{ justifyContent: 'space-between', margin: '4px 0 12px' }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Ações prioritárias</h2>
+          <span className="faint" style={{ fontSize: 12.5 }}>3 itens requerem atenção</span>
+        </div>
+        <div className="three-col" style={{ marginBottom: 22 }}>
+          {actions.map((a, i) => (
+            <div className="card" key={i} style={{ padding: '16px 17px' }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <span className="ic" style={{
+                  width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center',
+                  background: `var(--${a.tone}-soft)`, color: `var(--${a.tone})`,
+                }}><Icon name={a.icon} size={17} /></span>
+                <Pill kind={a.tone}>{a.tag}</Pill>
+              </div>
+              <div className="row" style={{ alignItems: 'baseline', gap: 8, margin: '13px 0 2px' }}>
+                <span className="mono" style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-0.03em', color: `var(--${a.tone})` }}>{a.n}</span>
+                <b style={{ fontSize: 14 }}>{a.title}</b>
+              </div>
+              <p className="muted" style={{ fontSize: 12.5, margin: '2px 0 15px' }}>{a.desc}</p>
+              <button className="btn sm" style={{ width: '100%', justifyContent: 'center' }} onClick={actionHandlers[i]}>{a.cta}<Icon name="chevR" size={14} /></button>
             </div>
-            <div style={{ width: '100%', height: '5px', background: '#21262d', borderRadius: '3px' }}>
-              <div style={{ width: `${(metrics.equipamentos.ativos / metrics.equipamentos.total) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #00ff94, #00cfff)', borderRadius: '3px' }} />
+          ))}
+        </div>
+
+        {/* alerts + systems */}
+        <div className="two-col">
+          <div className="card">
+            <div className="card-h">
+              <h3>Alertas recentes</h3>
+              <span className="sub">tempo real</span>
+              <button className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => setTelaAtiva && setTelaAtiva('ocorrencias')}>Ver todos<Icon name="chevR" size={14} /></button>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-            <button className="pi-btn">Ver ativos</button>
-            <button className="pi-btn">Em manutenção</button>
-          </div>
-        </div>
-
-        {/* Card Chamados */}
-        <div className="pi-card">
-          <p className="pi-sub">Chamados ativos</p>
-          <div className="pi-big-num">{metrics.chamados.total}</div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Críticos</div><div style={{ fontWeight: 700, color: '#ff2d55' }}>{metrics.chamados.criticos}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Urgentes</div><div style={{ fontWeight: 700, color: '#ff6a00' }}>{metrics.chamados.urgentes}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Andamento</div><div style={{ fontWeight: 700, color: '#ffe600' }}>{metrics.chamados.emAndamento}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Aprovação</div><div style={{ fontWeight: 700, color: '#00cfff' }}>{metrics.chamados.aguardandoAprovacao}</div></div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-            <button className="pi-btn">Ver chamados</button>
-            <button className="pi-btn">+ Novo chamado</button>
-          </div>
-        </div>
-
-        {/* Card Anomalias IA */}
-        <div className="pi-card">
-          <p className="pi-sub">Anomalias detectadas pela IA</p>
-          <div className="pi-big-num">{metrics.anomalias.detectadas}</div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Falhas Reais</div><div style={{ fontWeight: 700, color: '#ff2d55' }}>{metrics.anomalias.falhasReais}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Falsos Positivos</div><div style={{ fontWeight: 700, color: '#00ff94' }}>{metrics.anomalias.falsosPositivos}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Score Alto</div><div style={{ fontWeight: 700, color: '#ff6a00' }}>{metrics.anomalias.isolationForestAlerts}</div></div>
-          </div>
-          <div style={{ marginTop: '12px', fontSize: '0.75rem', color: '#8b949e' }}>
-            Isolation Forest · LightGBM · RAG
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-            <button className="pi-btn">Ver ocorrências</button>
-            <button className="pi-btn">⚡ Acionar IA</button>
-          </div>
-        </div>
-
-        {/* Card Utilizadores */}
-        <div className="pi-card">
-          <p className="pi-sub">Utilizadores do sistema</p>
-          <div className="pi-big-num">{metrics.utilizadores.total}</div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Técnicos</div><div style={{ fontWeight: 700, color: '#00cfff' }}>{metrics.utilizadores.tecnicos}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Supervisores</div><div style={{ fontWeight: 700, color: '#ffe600' }}>{metrics.utilizadores.supervisores}</div></div>
-            <div className="pi-divider" />
-            <div><div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Admins</div><div style={{ fontWeight: 700, color: '#00ff94' }}>{metrics.utilizadores.admins}</div></div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-            <button className="pi-btn">Gerir utilizadores</button>
-          </div>
-        </div>
-
-      </div>
-
-      {/* ── SESSÃO 2: AÇÕES PRINCIPAIS ── */}
-      <div className="pi-section-title">Ações principais</div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-        {filtros.map(f => (
-          <button key={f} className={`pi-pill ${filtroAtivo === f ? 'active' : ''}`} onClick={() => setFiltroAtivo(f)}>{f}</button>
-        ))}
-      </div>
-      <div className="pi-grid-4">
-        {acoesPrincipais.map((a, i) => (
-          <div key={i} className="pi-card" style={{ animationDelay: `${i * 0.08}s` }}>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>
-              {a.titulo}
-              <span className={`pi-badge ${a.badgeClass}`}>{a.badge}</span>
-            </h4>
-            <p style={{ fontWeight: 700, margin: '12px 0 8px', fontSize: '0.85rem' }}>{a.corpo}</p>
-            {a.detalhes.map((d, j) => (
-              <div key={j} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#8b949e', padding: '3px 0' }}>
-                <span>{d.label}</span><span style={{ color: '#ff6a00' }}>{d.valor}</span>
-              </div>
-            ))}
-            {a.subtexto && <p style={{ fontSize: '0.78rem', color: '#8b949e', margin: '6px 0 0' }}>{a.subtexto}</p>}
-          </div>
-        ))}
-      </div>
-
-      {/* ── SESSÃO 3: ALERTAS RECENTES + STATUS ── */}
-      <div className="pi-grid-2" style={{ marginTop: '28px' }}>
-
-        {/* Alertas recentes */}
-        <div className="pi-card" style={{ gridColumn: '1 / 2' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Alertas recentes</h4>
-            <button className="pi-btn">Ver todos →</button>
-          </div>
-          {/* Header da tabela */}
-          <div className="pi-alert-row" style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 600, borderBottom: '1px solid #21262d', padding: '6px 14px' }}>
-            <span>EMPRESA</span><span>EQUIPAMENTO</span><span>TIPO</span><span>PRIORIDADE</span><span>HORA</span>
-          </div>
-          {alertasRecentes.map(a => {
-            const tipo = tipoConfig[a.tipo] || tipoConfig['Em Análise'];
-            return (
-              <div key={a.id} className="pi-alert-row">
-                <span style={{ color: '#c9d1d9', fontSize: '0.8rem' }}>{a.empresa}</span>
-                <span style={{ color: '#8b949e' }}>{a.equipamento}</span>
-                <span style={{ color: tipo.color, fontSize: '0.75rem' }}>{tipo.label}</span>
-                <PrioridadeBadge nivel={a.prioridade} />
-                <span style={{ color: '#8b949e', textAlign: 'right' }}>{a.hora}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Status geral + OPEX */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-          <div className="pi-card">
-            <h4 style={{ margin: '0 0 14px', fontSize: '0.9rem' }}>Estado dos sistemas <span className="pi-badge status-good">Online</span></h4>
-            {[
-              { label: 'Sistema Galileo (API)',       status: 'Operacional', cor: '#00ff94' },
-              { label: 'Motor Isolation Forest',      status: 'Operacional', cor: '#00ff94' },
-              { label: 'Serviço RAG / LlamaIndex',   status: 'Operacional', cor: '#00ff94' },
-              { label: 'Mensageria (RabbitMQ)',       status: 'Operacional', cor: '#00ff94' },
-              { label: 'Pipeline ETL Python',         status: 'Atenção',     cor: '#ffe600' },
-            ].map((s, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', padding: '6px 0', borderBottom: '1px solid #21262d' }}>
-                <span style={{ color: '#c9d1d9' }}>{s.label}</span>
-                <span style={{ color: s.cor, fontWeight: 600 }}>● {s.status}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="pi-card">
-            <h4 style={{ margin: '0 0 10px', fontSize: '0.9rem' }}>Eficiência energética (OPEX)</h4>
-            <div className="pi-grid-2" style={{ gap: '10px' }}>
-              <div style={{ background: '#0d1117', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Fora do Set Point</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ff6a00' }}>6</div>
-                <div style={{ fontSize: '0.7rem', color: '#8b949e' }}>equipamentos</div>
-              </div>
-              <div style={{ background: '#0d1117', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Impacto estimado</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ffe600' }}>+14%</div>
-                <div style={{ fontSize: '0.7rem', color: '#8b949e' }}>consumo elétrico</div>
-              </div>
-              <div style={{ background: '#0d1117', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Time to Failure</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ff2d55' }}>3h 20m</div>
-                <div style={{ fontSize: '0.7rem', color: '#8b949e' }}>equipamento crítico</div>
-              </div>
-              <div style={{ background: '#0d1117', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.72rem', color: '#8b949e' }}>Ativos eficientes</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#00ff94' }}>89%</div>
-                <div style={{ fontSize: '0.7rem', color: '#8b949e' }}>dentro do padrão</div>
-              </div>
+            <div className="card-b flush">
+              <table className="tbl">
+                <thead><tr>
+                  <th>Empresa</th><th>Equipamento</th><th>Classificação IA</th><th className="c">Prioridade</th><th className="r">Score</th><th className="r">Hora</th>
+                </tr></thead>
+                <tbody>
+                  {D.alerts.slice(0, 7).map((a) => (
+                    <tr key={a.id}>
+                      <td className="cellmain">{a.emp}</td>
+                      <td className="muted">{a.eq}</td>
+                      <td><TipoPill v={a.tipo} /></td>
+                      <td className="c"><PrioPill v={a.prioridade} /></td>
+                      <td className="r num" style={{ color: a.score > 0.8 ? 'var(--red)' : a.score > 0.6 ? 'var(--amber)' : 'var(--text-dim)' }}>{a.score}</td>
+                      <td className="r num faint">{a.hora}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
-        </div>
-      </div>
+          <div className="col" style={{ gap: 16 }}>
+            <div className="card">
+              <div className="card-h"><h3>Estado dos sistemas</h3>
+                <span className="pill green" style={{ marginLeft: 'auto' }}><span className="dot" />Online</span></div>
+              <div className="card-b" style={{ display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 0' }}>
+                {systems.map((s, i) => (
+                  <div className="row" key={i} style={{ justifyContent: 'space-between', padding: '9px 16px', borderBottom: i < systems.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div className="row" style={{ gap: 10 }}>
+                      <span className={'statusdot ' + s.state} />
+                      <span style={{ fontSize: 13 }}>{s.name}</span>
+                    </div>
+                    <div className="col" style={{ alignItems: 'flex-end', lineHeight: 1.2 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: s.state === 'green' ? 'var(--green)' : 'var(--amber)' }}>{s.ok}</span>
+                      <span className="faint mono" style={{ fontSize: 10.5 }}>{s.meta}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-    </div>
+            <div className="card">
+              <div className="card-h"><h3>Eficiência energética</h3><span className="sub">OPEX · 24h</span></div>
+              <div className="card-b" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                {[{ l: 'Fora do set point', v: '6', u: 'equip.', c: '--amber' },
+                  { l: 'Impacto estimado', v: '+14', u: '%', c: '--red' },
+                  { l: 'Time to Failure', v: '31', u: 'h', c: '--cyan' },
+                  { l: 'Ativos eficientes', v: '89', u: '%', c: '--green' }].map((m, i) => (
+                  <div key={i}>
+                    <div className="faint" style={{ fontSize: 11.5, marginBottom: 4 }}>{m.l}</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 600, color: `var(${m.c})` }}>{m.v}<span style={{ fontSize: 12, color: 'var(--text-faint)', marginLeft: 3 }}>{m.u}</span></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+
+      <Modal open={modal === 'novo'} onClose={() => setModal(null)} title="Novo chamado" sub="Abertura manual de chamado"
+        footer={<>
+          <button className="btn ghost sm" onClick={() => setModal(null)}>Cancelar</button>
+          <button className="btn primary sm" onClick={() => setModal(null)}>Criar chamado</button>
+        </>}>
+        <div className="form-row"><label className="lbl">Título<span>Descreva o problema observado</span></label>
+          <input className="inp" placeholder="Ex: Temperatura fora do set point" /></div>
+        <div className="form-row"><label className="lbl">Empresa</label>
+          <select className="inp"><option value="">Selecione...</option>{D.sites.map((s) => <option key={s.id}>{s.name}</option>)}</select></div>
+        <div className="form-row"><label className="lbl">Prioridade</label>
+          <select className="inp">{D.prioridades.map((p) => <option key={p}>{p}</option>)}</select></div>
+      </Modal>
+
+      <Modal open={modal === 'tecnicos'} onClose={() => setModal(null)} title="Chamados sem responsável" sub={`${semTecnico.length} chamados aguardando atribuição`} width={560}
+        footer={<button className="btn primary sm" onClick={() => setModal(null)}>Concluir</button>}>
+        <div className="col" style={{ gap: 10 }}>
+          {semTecnico.map((c) => (
+            <div className="row" key={c.id} style={{ justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="col">
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{c.id} · {c.titulo}</span>
+                <span className="faint" style={{ fontSize: 11.5 }}>{c.emp} · {c.eq}</span>
+              </div>
+              <select className="inp" style={{ width: 160 }} value={c.tecnico} onChange={(e) => atribuir(c.id, e.target.value)}>
+                {D.tecnicos.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          ))}
+          {semTecnico.length === 0 && <p className="muted">Todos os chamados já possuem técnico atribuído.</p>}
+        </div>
+      </Modal>
+
+      <Modal open={modal === 'manutencao'} onClose={() => setModal(null)} title="Manutenções atrasadas" sub={`${atrasadas.length} intervenções com prazo vencido`} width={560}
+        footer={<button className="btn primary sm" onClick={() => setModal(null)}>Concluir</button>}>
+        <div className="col" style={{ gap: 10 }}>
+          {atrasadas.map((m) => (
+            <div className="row" key={m.id} style={{ justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="col">
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{m.id} · {m.ativo}</span>
+                <span className="faint" style={{ fontSize: 11.5 }}>{m.empresa} · {m.tipo} · técnico {m.tecnico}</span>
+              </div>
+              <button className="btn sm" onClick={() => confirmarAgendamento(m.id)}><Icon name="calendar" size={13} />Agendar</button>
+            </div>
+          ))}
+          {atrasadas.length === 0 && <p className="muted">Nenhuma manutenção atrasada pendente.</p>}
+        </div>
+      </Modal>
+    </>
   );
 }
