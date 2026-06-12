@@ -28,3 +28,6 @@ dist-ssr
 *.sw?
 
 .env
+.claude
+.claude.*
+.claude-*   
