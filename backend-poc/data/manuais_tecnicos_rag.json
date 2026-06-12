@@ -1,0 +1,653 @@
+{
+  "versao": "2.0.0",
+  "empresa": "Eletrofrio Refrigeração Ltda. — CNPJ 76.498.179/0001-10",
+  "descricao": "Base de conhecimento técnico para consulta RAG — Eletrofrio OS / Plataforma Galileo",
+  "nota": "Schema baseado em especificações reais de refrigeração comercial. Os manuais completos devem ser substituídos pelos documentos oficiais da Eletrofrio quando disponíveis.",
+  "assistencia_tecnica": "0800 702 7080",
+
+  "integracao_galileo": {
+    "base_url": "https://credenciamento.eletrofrio.com.br:5900/galileo/api/api_hackathon",
+    "endpoints": {
+      "alarmes":       { "route": "alarmes",    "metodo": "GET/POST",  "descricao": "Lista de alarmes dos últimos 30 dias" },
+      "unidades":      { "route": "unidades",   "metodo": "GET/POST",  "descricao": "Lista de todas as lojas/unidades cadastradas" },
+      "telemetria":    { "route": "telemetria", "metodo": "GET/POST",  "params": "dispositivoId=ID", "descricao": "Dados de telemetria de um dispositivo específico" },
+      "abrir_chamado": { "route": "abrir-chamado", "metodo": "POST",   "descricao": "Simulação de abertura de ticket técnico" }
+    },
+    "payload_abrir_chamado": {
+      "equipe":       "string — nome da equipe/sistema",
+      "lojaId":       "integer — ID da unidade",
+      "lojaNome":     "string — nome da loja",
+      "dispositivoId":"integer — ID do dispositivo",
+      "tag":          "string — identificador do equipamento (ex: 2R8 - EXP. DE AÇOUGUE)",
+      "motivoIA":     "string — diagnóstico gerado pela IA",
+      "requerTecnico":"boolean"
+    },
+    "variaveis_telemetria": {
+      "temperatura_ambiente_c":     "Temperatura do ar interno do equipamento (°C)",
+      "temperatura_evaporador_c":   "Temperatura na serpentina do evaporador (°C)",
+      "pressao_succao_bar":         "Pressão no lado de baixa pressão do compressor (bar)",
+      "pressao_descarga_bar":       "Pressão no lado de alta pressão do compressor (bar)",
+      "tensao_compressor_v":        "Tensão elétrica de alimentação do compressor (V)",
+      "corrente_compressor_a":      "Corrente elétrica consumida pelo compressor (A)",
+      "status_porta":               "ABERTA | FECHADA",
+      "status_degelo":              "ATIVO | INATIVO"
+    }
+  },
+
+  "tipos_equipamento": [
+    {
+      "id": "EXP_ACOUGUE",
+      "nome": "Expositor de Açougue",
+      "tag_exemplo": "2R8 - EXP. DE AÇOUGUE",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 2,
+      "faixa_operacao_c": { "min": 0, "max": 4 },
+      "pressao_succao_normal_bar": { "min": 1.0, "max": 1.6 },
+      "pressao_descarga_normal_bar": { "min": 10, "max": 16 },
+      "corrente_compressor_normal_a": { "min": 3.5, "max": 6.5 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 20,
+      "intervalo_degelo_horas": 6,
+      "normativa": "ANVISA RDC 216/2004 — carnes devem ser mantidas entre 0°C e 4°C",
+      "impacto_falha": "CRITICO — risco sanitário imediato em produtos cárneos",
+      "tempo_critico_fora_faixa_min": 30
+    },
+    {
+      "id": "EXP_LATICINIOS",
+      "nome": "Expositor de Laticínios",
+      "tag_exemplo": "EXP. LATICINIOS",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 4,
+      "faixa_operacao_c": { "min": 2, "max": 8 },
+      "pressao_succao_normal_bar": { "min": 1.2, "max": 2.0 },
+      "pressao_descarga_normal_bar": { "min": 9, "max": 15 },
+      "corrente_compressor_normal_a": { "min": 3.0, "max": 5.5 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 20,
+      "intervalo_degelo_horas": 8,
+      "normativa": "ANVISA — laticínios entre 2°C e 8°C",
+      "impacto_falha": "ALTO — risco de deterioração de leite, queijos e iogurtes",
+      "tempo_critico_fora_faixa_min": 60
+    },
+    {
+      "id": "EXP_PEIXARIA",
+      "nome": "Expositor de Peixaria",
+      "tag_exemplo": "EXP. PEIXARIA",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 0,
+      "faixa_operacao_c": { "min": -2, "max": 2 },
+      "pressao_succao_normal_bar": { "min": 0.8, "max": 1.4 },
+      "pressao_descarga_normal_bar": { "min": 10, "max": 16 },
+      "corrente_compressor_normal_a": { "min": 4.0, "max": 7.0 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 25,
+      "intervalo_degelo_horas": 6,
+      "normativa": "ANVISA — pescados devem ser mantidos entre -2°C e 2°C",
+      "impacto_falha": "CRITICO — pescados são altamente perecíveis",
+      "tempo_critico_fora_faixa_min": 20
+    },
+    {
+      "id": "EXP_CONGELADOS",
+      "nome": "Expositor de Congelados",
+      "tag_exemplo": "EXP. CONGELADOS",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": -18,
+      "faixa_operacao_c": { "min": -22, "max": -15 },
+      "pressao_succao_normal_bar": { "min": 0.2, "max": 0.6 },
+      "pressao_descarga_normal_bar": { "min": 12, "max": 18 },
+      "corrente_compressor_normal_a": { "min": 5.0, "max": 9.0 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 40,
+      "intervalo_degelo_horas": 6,
+      "normativa": "ANVISA — congelados devem ser mantidos a -18°C ou menos",
+      "impacto_falha": "CRITICO — descongelamento causa perda total do lote",
+      "tempo_critico_fora_faixa_min": 45
+    },
+    {
+      "id": "EXP_HORTIFRUTI",
+      "nome": "Expositor de Hortifrúti",
+      "tag_exemplo": "EXP. HORTIFRUTI",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 8,
+      "faixa_operacao_c": { "min": 5, "max": 12 },
+      "pressao_succao_normal_bar": { "min": 1.5, "max": 2.5 },
+      "pressao_descarga_normal_bar": { "min": 8, "max": 14 },
+      "corrente_compressor_normal_a": { "min": 2.5, "max": 5.0 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 15,
+      "intervalo_degelo_horas": 8,
+      "normativa": "Boas práticas de conservação — frutas e verduras entre 5°C e 12°C",
+      "impacto_falha": "MEDIO — deterioração acelerada de FLV",
+      "tempo_critico_fora_faixa_min": 120
+    },
+    {
+      "id": "EXP_BEBIDAS",
+      "nome": "Expositor de Bebidas",
+      "tag_exemplo": "EXP. BEBIDAS",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 5,
+      "faixa_operacao_c": { "min": 2, "max": 10 },
+      "pressao_succao_normal_bar": { "min": 1.2, "max": 2.0 },
+      "pressao_descarga_normal_bar": { "min": 9, "max": 15 },
+      "corrente_compressor_normal_a": { "min": 3.0, "max": 5.5 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 20,
+      "intervalo_degelo_horas": 8,
+      "normativa": "Temperatura de consumo ideal entre 2°C e 10°C",
+      "impacto_falha": "BAIXO — impacto financeiro, sem risco sanitário direto",
+      "tempo_critico_fora_faixa_min": 180
+    },
+    {
+      "id": "EXP_CONFEITARIA",
+      "nome": "Expositor de Confeitaria",
+      "tag_exemplo": "EXP. CONFEITARIA",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 5,
+      "faixa_operacao_c": { "min": 2, "max": 8 },
+      "pressao_succao_normal_bar": { "min": 1.2, "max": 2.0 },
+      "pressao_descarga_normal_bar": { "min": 9, "max": 15 },
+      "corrente_compressor_normal_a": { "min": 3.0, "max": 5.5 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 20,
+      "intervalo_degelo_horas": 8,
+      "normativa": "Bolos e doces com creme: máximo 5°C (ANVISA)",
+      "impacto_falha": "ALTO — bolos com recheio são de alto risco sanitário",
+      "tempo_critico_fora_faixa_min": 45
+    },
+    {
+      "id": "EXP_EMBUTIDOS",
+      "nome": "Expositor de Embutidos / Fiambreria",
+      "tag_exemplo": "EXP. EMBUTIDOS FIAMBRERIA",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 4,
+      "faixa_operacao_c": { "min": 0, "max": 7 },
+      "pressao_succao_normal_bar": { "min": 1.0, "max": 1.8 },
+      "pressao_descarga_normal_bar": { "min": 10, "max": 16 },
+      "corrente_compressor_normal_a": { "min": 3.0, "max": 6.0 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 20,
+      "intervalo_degelo_horas": 6,
+      "normativa": "ANVISA — frios e embutidos entre 0°C e 7°C",
+      "impacto_falha": "ALTO — risco de crescimento bacteriano em frios fatiados",
+      "tempo_critico_fora_faixa_min": 60
+    },
+    {
+      "id": "EXP_ROTISSERIA",
+      "nome": "Expositor de Rotisseria",
+      "tag_exemplo": "EXP. ROTISSERIA",
+      "categoria": "Expositores Refrigerados",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 4,
+      "faixa_operacao_c": { "min": 0, "max": 5 },
+      "pressao_succao_normal_bar": { "min": 1.0, "max": 1.8 },
+      "pressao_descarga_normal_bar": { "min": 10, "max": 16 },
+      "corrente_compressor_normal_a": { "min": 3.5, "max": 6.5 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 20,
+      "intervalo_degelo_horas": 6,
+      "normativa": "ANVISA RDC 216/2004 — pratos prontos entre 0°C e 5°C",
+      "impacto_falha": "CRITICO — alimentos prontos para consumo",
+      "tempo_critico_fora_faixa_min": 30
+    },
+    {
+      "id": "CAMARA_RESFRIADO",
+      "nome": "Câmara Fria — Resfriados",
+      "tag_exemplo": "CAMARA FRIA RESFRIADOS",
+      "categoria": "Câmaras Frigoríficas",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": 2,
+      "faixa_operacao_c": { "min": 0, "max": 5 },
+      "pressao_succao_normal_bar": { "min": 1.0, "max": 1.8 },
+      "pressao_descarga_normal_bar": { "min": 10, "max": 17 },
+      "corrente_compressor_normal_a": { "min": 4.0, "max": 8.0 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 30,
+      "intervalo_degelo_horas": 8,
+      "normativa": "ANVISA — câmaras de resfriamento entre 0°C e 5°C",
+      "impacto_falha": "CRITICO — perda total do estoque armazenado",
+      "tempo_critico_fora_faixa_min": 60
+    },
+    {
+      "id": "CAMARA_CONGELADO",
+      "nome": "Câmara Fria — Congelados",
+      "tag_exemplo": "CAMARA FRIA CONGELADOS",
+      "categoria": "Câmaras Frigoríficas",
+      "fluido_refrigerante": "R-404A",
+      "set_point_temp_c": -18,
+      "faixa_operacao_c": { "min": -22, "max": -15 },
+      "pressao_succao_normal_bar": { "min": 0.2, "max": 0.6 },
+      "pressao_descarga_normal_bar": { "min": 12, "max": 18 },
+      "corrente_compressor_normal_a": { "min": 5.0, "max": 10.0 },
+      "tensao_alimentacao_v": { "min": 187, "max": 242 },
+      "ciclo_degelo_minutos": 45,
+      "intervalo_degelo_horas": 6,
+      "normativa": "ANVISA — câmaras de congelamento a -18°C ou menos",
+      "impacto_falha": "CRITICO — descongelamento causa perda total e risco sanitário",
+      "tempo_critico_fora_faixa_min": 45
+    }
+  ],
+
+  "codigos_alarme": [
+    {
+      "codigo": "AL-01",
+      "nome": "Alta Temperatura — Limite Crítico",
+      "descricao": "Temperatura interna ultrapassou o set point em mais de 5°C por mais de 15 minutos.",
+      "variaveis": ["temperatura_ambiente_c", "temperatura_evaporador_c"],
+      "condicao": "temperatura_ambiente_c > (set_point + 5) por 15+ min",
+      "severidade": "CRITICA",
+      "causas": [
+        "Porta aberta ou vedação danificada",
+        "Falha ou parada do compressor",
+        "Vazamento de fluido refrigerante R-404A",
+        "Condensador sujo ou obstruído — comum em açougue e peixaria",
+        "Falha no ventilador do evaporador",
+        "Excesso de produto bloqueando circulação de ar"
+      ],
+      "acoes_nivel_1_operador": [
+        "Verificar imediatamente se a porta está completamente fechada",
+        "Verificar se há produtos bloqueando as grades de ventilação interna",
+        "Checar se o compressor está ligado — ouvir ruído de funcionamento",
+        "Se for açougue/peixaria/rotisseria: acionar protocolo de risco sanitário imediatamente"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Medir pressão de sucção e descarga com manifold",
+        "Verificar corrente do compressor com alicate amperímetro",
+        "Inspecionar vedação e borracha da porta",
+        "Verificar funcionamento e rotação do ventilador do evaporador",
+        "Checar nível de gelo no evaporador — degelo forçado se necessário"
+      ],
+      "requer_tecnico": true,
+      "abrir_chamado_automatico": true,
+      "score_minimo": 0.75,
+      "equipamentos_criticos": ["EXP_ACOUGUE", "EXP_PEIXARIA", "EXP_ROTISSERIA", "CAMARA_CONGELADO"]
+    },
+    {
+      "codigo": "AL-02",
+      "nome": "Baixa Pressão de Sucção",
+      "descricao": "Pressão de sucção abaixo do limite mínimo operacional — possível vazamento de gás ou válvula de expansão travada.",
+      "variaveis": ["pressao_succao_bar", "temperatura_evaporador_c"],
+      "condicao": "pressao_succao_bar < pressao_succao_normal.min do tipo do equipamento",
+      "severidade": "CRITICA",
+      "causas": [
+        "Vazamento de fluido refrigerante R-404A",
+        "Válvula de expansão termostática (VET) travada fechada",
+        "Filtro secador entupido — fica gelado externamente",
+        "Evaporador com acúmulo excessivo de gelo bloqueando fluxo de ar",
+        "Carga de gás insuficiente por manutenção anterior incorreta"
+      ],
+      "acoes_nivel_1_operador": [
+        "NÃO tente resolver sem treinamento técnico",
+        "Registrar horário e valor da pressão lida no painel",
+        "Verificar visualmente se há geada excessiva no evaporador",
+        "Verificar se há mancha de óleo nas tubulações — indica vazamento"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Verificar carga de gás com manifold — comparar com especificação da plaqueta",
+        "Inspecionar tubulações com detector de vazamento eletrônico",
+        "Verificar filtro secador — se gelado externamente está entupido",
+        "Checar abertura da VET com termômetro na linha de sucção",
+        "Verificar evaporador quanto a bloqueio por gelo"
+      ],
+      "requer_tecnico": true,
+      "abrir_chamado_automatico": true,
+      "score_minimo": 0.80
+    },
+    {
+      "codigo": "AL-03",
+      "nome": "Alta Pressão de Descarga",
+      "descricao": "Pressão de descarga acima do limite máximo — problema na condensação.",
+      "variaveis": ["pressao_descarga_bar", "corrente_compressor_a"],
+      "condicao": "pressao_descarga_bar > pressao_descarga_normal.max do tipo do equipamento",
+      "severidade": "ALTA",
+      "causas": [
+        "Condensador sujo por acúmulo de gordura — muito comum em açougue e peixaria",
+        "Ventilador do condensador com falha ou travado",
+        "Temperatura ambiente muito elevada (>38°C) — comum no verão",
+        "Excesso de carga de gás refrigerante",
+        "Ar ou nitrogênio no sistema por manutenção incorreta"
+      ],
+      "acoes_nivel_1_operador": [
+        "Verificar se o ventilador do condensador está girando",
+        "Verificar se há obstrução nas grades de saída de ar quente",
+        "Limpar condensador com escova ou ar comprimido se acessível"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Medir temperatura de condensação com termômetro de contato",
+        "Verificar corrente do motor do ventilador do condensador",
+        "Limpeza profunda do condensador com produto desengraxante",
+        "Verificar carga de gás — possível excesso"
+      ],
+      "requer_tecnico": false,
+      "abrir_chamado_automatico": false,
+      "score_minimo": 0.65
+    },
+    {
+      "codigo": "AL-04",
+      "nome": "Degelo Excessivo — Tempo Ultrapassado",
+      "descricao": "Ciclo de degelo durou mais que 1,5x o tempo configurado.",
+      "variaveis": ["status_degelo", "temperatura_evaporador_c", "temperatura_ambiente_c"],
+      "condicao": "status_degelo == ATIVO por mais de (ciclo_degelo_minutos * 1.5)",
+      "severidade": "ALTA",
+      "causas": [
+        "Resistência de degelo com defeito — medir resistência: 20-100 Ohm",
+        "Termostato/sensor de fim de degelo com falha",
+        "Formação excessiva de gelo por porta aberta repetidamente",
+        "Temporizador de degelo mal configurado no CLP",
+        "Drenagem do degelo bloqueada — água acumulando"
+      ],
+      "acoes_nivel_1_operador": [
+        "Verificar se o degelo terminou após o tempo esperado",
+        "Checar se há gelo excessivo visível no evaporador",
+        "Verificar se há água acumulada na bandeja de drenagem"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Medir resistência da resistência de degelo (multímetro): deve estar entre 20-100 Ohm",
+        "Verificar termostato de fim de degelo com multímetro",
+        "Inspecionar e desobstruir drenagem do degelo",
+        "Rever configuração de tempo de degelo no CLP"
+      ],
+      "requer_tecnico": true,
+      "abrir_chamado_automatico": true,
+      "score_minimo": 0.60
+    },
+    {
+      "codigo": "AL-05",
+      "nome": "Sobrecorrente no Compressor",
+      "descricao": "Corrente elétrica do compressor acima de 120% do limite nominal — risco de travamento.",
+      "variaveis": ["corrente_compressor_a", "tensao_compressor_v"],
+      "condicao": "corrente_compressor_a > corrente_normal.max * 1.2",
+      "severidade": "CRITICA",
+      "causas": [
+        "Início de falha mecânica interna do compressor",
+        "Alta pressão de descarga forçando sobretrabalhado",
+        "Tensão de alimentação abaixo do mínimo (< 187V)",
+        "Capacitor de partida ou funcionamento com defeito",
+        "Compressor em início de travamento (locked rotor)"
+      ],
+      "acoes_nivel_1_operador": [
+        "NÃO desligue e religue o compressor repetidamente — agrava o problema",
+        "Registrar valor de corrente e tensão no momento do alarme",
+        "Verificar se o disjuntor do compressor não disparou"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Medir tensão de alimentação nos terminais do compressor",
+        "Verificar capacitor de partida e de funcionamento",
+        "Medir resistência dos enrolamentos do motor com multímetro",
+        "Verificar relé de proteção por sobrecarga (klixon/protetor térmico)"
+      ],
+      "requer_tecnico": true,
+      "abrir_chamado_automatico": true,
+      "score_minimo": 0.85
+    },
+    {
+      "codigo": "AL-06",
+      "nome": "Porta Aberta — Tempo Prolongado",
+      "descricao": "Sensor de porta detectou abertura por mais de 5 minutos contínuos.",
+      "variaveis": ["status_porta", "temperatura_ambiente_c"],
+      "condicao": "status_porta == ABERTA por mais de 5 minutos",
+      "severidade": "MEDIA",
+      "causas": [
+        "Operação de abastecimento prolongada",
+        "Mola de fechamento automático danificada",
+        "Porta emperrada ou mal alinhada nas dobradiças",
+        "Operador não fechou após uso"
+      ],
+      "acoes_nivel_1_operador": [
+        "Fechar a porta imediatamente",
+        "Verificar se a borracha de vedação perimetral está íntegra",
+        "Verificar se a mola de fechamento automático está funcionando"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Verificar alinhamento das dobradiças",
+        "Substituir borracha de vedação se danificada ou ressecada",
+        "Ajustar ou substituir mola de fechamento automático"
+      ],
+      "requer_tecnico": false,
+      "abrir_chamado_automatico": false,
+      "score_minimo": 0.30
+    },
+    {
+      "codigo": "AL-07",
+      "nome": "Falha de Comunicação BOS/CLP",
+      "descricao": "Perda de comunicação entre o controlador local (BOS) e a Plataforma Galileo por mais de 2 minutos.",
+      "variaveis": [],
+      "condicao": "ausencia de dado de telemetria por mais de 2 minutos",
+      "severidade": "ALTA",
+      "causas": [
+        "Falha na conexão de rede (cabo Ethernet ou Wi-Fi instável)",
+        "Módulo BOS reiniciado ou com falha de firmware",
+        "Queda de energia no ponto do equipamento",
+        "Roteador ou switch de rede com problema"
+      ],
+      "acoes_nivel_1_operador": [
+        "Verificar se o painel do equipamento está energizado (leds acesos)",
+        "Verificar LED de status da unidade BOS — deve piscar em verde"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Verificar cabo de rede ou intensidade do sinal Wi-Fi no local",
+        "Reiniciar módulo BOS: desligar, aguardar 30 segundos, religar",
+        "Verificar logs de erro no CLP pelo painel local",
+        "Contatar suporte Eletrofrio: 0800 702 7080"
+      ],
+      "requer_tecnico": false,
+      "abrir_chamado_automatico": true,
+      "score_minimo": 0.0
+    },
+    {
+      "codigo": "AL-08",
+      "nome": "Tensão de Alimentação Fora da Faixa",
+      "descricao": "Tensão elétrica fora da faixa segura de operação (187V–242V para equipamentos 220V).",
+      "variaveis": ["tensao_compressor_v"],
+      "condicao": "tensao_compressor_v < 187 OR tensao_compressor_v > 242",
+      "severidade": "ALTA",
+      "causas": [
+        "Problema na rede elétrica do estabelecimento",
+        "Disjuntor subdimensionado ou degradado",
+        "Queda de tensão por múltiplos equipamentos no mesmo circuito",
+        "Fase aberta em instalação trifásica"
+      ],
+      "acoes_nivel_1_operador": [
+        "Verificar se outros equipamentos do mesmo circuito apresentam problemas",
+        "Checar se o disjuntor do quadro não está aquecido ou disparado"
+      ],
+      "acoes_nivel_2_tecnico": [
+        "Medir tensão nas três fases do quadro elétrico",
+        "Verificar bitola do cabeamento elétrico",
+        "Avaliar instalação de estabilizador de tensão",
+        "Chamar eletricista para verificar a instalação"
+      ],
+      "requer_tecnico": true,
+      "abrir_chamado_automatico": true,
+      "score_minimo": 0.50
+    },
+    {
+      "codigo": "AL-09",
+      "nome": "Temperatura Próxima ao Limite — Alerta Preventivo",
+      "descricao": "Temperatura interna entre 3°C e 5°C acima do set point. Ainda dentro da faixa operacional, mas tendência de deterioração.",
+      "variaveis": ["temperatura_ambiente_c"],
+      "condicao": "temperatura_ambiente_c entre (set_point + 3) e (set_point + 5) por 20+ min",
+      "severidade": "MEDIA",
+      "causas": [
+        "Abastecimento recente com produto quente",
+        "Alta movimentação de clientes com porta abrindo frequentemente",
+        "Condensador precisando de limpeza preventiva",
+        "Início de degradação do ciclo de refrigeração"
+      ],
+      "acoes_nivel_1_operador": [
+        "Monitorar manualmente a cada 10 minutos",
+        "Reduzir abertura de portas ao mínimo necessário",
+        "Verificar se o condensador precisa de limpeza"
+      ],
+      "acoes_nivel_2_tecnico": [],
+      "requer_tecnico": false,
+      "abrir_chamado_automatico": false,
+      "score_minimo": 0.40
+    },
+    {
+      "codigo": "AL-10",
+      "nome": "Ciclo de Degelo Normal — Falso Positivo",
+      "descricao": "Variação de temperatura detectada durante ciclo de degelo programado. Evento operacional normal.",
+      "variaveis": ["status_degelo", "temperatura_evaporador_c"],
+      "condicao": "status_degelo == ATIVO AND temperatura_evaporador_c subindo",
+      "severidade": "INFORMATIVO",
+      "causas": [
+        "Ciclo de degelo programado no CLP — comportamento esperado"
+      ],
+      "acoes_nivel_1_operador": [
+        "Nenhuma ação necessária — aguardar fim do ciclo de degelo",
+        "Tempo esperado de degelo: conforme ciclo_degelo_minutos do equipamento"
+      ],
+      "acoes_nivel_2_tecnico": [],
+      "requer_tecnico": false,
+      "abrir_chamado_automatico": false,
+      "score_minimo": 0.0
+    }
+  ],
+
+  "combinacoes_criticas": [
+    {
+      "alarmes": ["AL-01", "AL-02"],
+      "nome": "Vazamento de Gás em Andamento",
+      "interpretacao": "Alta temperatura + baixa pressão de sucção = forte indicativo de vazamento ativo de R-404A",
+      "severidade": "EMERGENCIA",
+      "time_to_failure_estimado_min": 30,
+      "acao_imediata": "Abrir chamado CRÍTICO + notificar supervisor + monitoramento a cada 5 minutos"
+    },
+    {
+      "alarmes": ["AL-05", "AL-01"],
+      "nome": "Compressor em Processo de Travamento",
+      "interpretacao": "Sobrecorrente + alta temperatura = compressor sobrecarregado próximo de travar",
+      "severidade": "EMERGENCIA",
+      "time_to_failure_estimado_min": 15,
+      "acao_imediata": "Abrir chamado CRÍTICO imediato — risco de queima do compressor"
+    },
+    {
+      "alarmes": ["AL-02", "AL-04"],
+      "nome": "Congelamento Severo do Evaporador com Suspeita de Vazamento",
+      "interpretacao": "Baixa pressão + degelo excessivo = possível evaporador congestionado com perda de gás",
+      "severidade": "CRITICA",
+      "time_to_failure_estimado_min": 60,
+      "acao_imediata": "Abrir chamado e agendar inspeção urgente"
+    },
+    {
+      "alarmes": ["AL-08", "AL-05"],
+      "nome": "Falha Elétrica com Risco ao Compressor",
+      "interpretacao": "Tensão fora da faixa + sobrecorrente = risco imediato de queima do compressor",
+      "severidade": "EMERGENCIA",
+      "time_to_failure_estimado_min": 10,
+      "acao_imediata": "Desligar equipamento imediatamente + chamar eletricista + abrir chamado"
+    },
+    {
+      "alarmes": ["AL-01", "AL-06"],
+      "nome": "Alta Temperatura por Porta Aberta",
+      "interpretacao": "Alta temperatura coincidindo com porta aberta = causa identificada, não é falha mecânica",
+      "severidade": "MEDIA",
+      "time_to_failure_estimado_min": 0,
+      "acao_imediata": "Fechar porta e monitorar normalização da temperatura"
+    }
+  ],
+
+  "regras_decisao_ia": {
+    "descricao": "Lógica de decisão do RAG integrada com dados da API Galileo",
+    "niveis": [
+      {
+        "nivel": 1,
+        "nome": "Orientação ao Operador",
+        "condicao": "isolation_forest_score < 0.50 AND requer_tecnico == false",
+        "acao": "RAG orienta operador com passo a passo baseado no manual. Sem chamado.",
+        "abrir_chamado": false,
+        "exemplos": ["AL-06", "AL-10", "AL-09"]
+      },
+      {
+        "nivel": 2,
+        "nome": "Alerta + Monitoramento Intensivo",
+        "condicao": "isolation_forest_score >= 0.50 AND isolation_forest_score < 0.75",
+        "acao": "Notificar supervisor, monitorar telemetria a cada 30s, orientar ação preventiva.",
+        "abrir_chamado": false,
+        "exemplos": ["AL-03", "AL-04", "AL-07", "AL-08"]
+      },
+      {
+        "nivel": 3,
+        "nome": "Abertura Automática de Chamado",
+        "condicao": "isolation_forest_score >= 0.75 AND requer_tecnico == true",
+        "acao": "IA chama ?route=abrir-chamado via API Galileo e notifica técnico.",
+        "abrir_chamado": true,
+        "exemplos": ["AL-01", "AL-02", "AL-05"],
+        "payload": {
+          "equipe": "Eletrofrio OS — IA Preditiva",
+          "lojaId": "{unidade.id}",
+          "lojaNome": "{unidade.nome}",
+          "dispositivoId": "{dispositivo.id}",
+          "tag": "{dispositivo.tag}",
+          "motivoIA": "{codigo}.nome: {diagnostico_contextualizado}",
+          "requerTecnico": true
+        }
+      },
+      {
+        "nivel": 4,
+        "nome": "Emergência — Risco de Perda Total",
+        "condicao": "isolation_forest_score >= 0.90 OR combinacao_critica detectada",
+        "acao": "Chamado CRÍTICO + notificação WhatsApp via Umbler + alerta pulsante no dashboard.",
+        "abrir_chamado": true,
+        "exemplos": ["AL-01+AL-02", "AL-05+AL-01", "AL-08+AL-05"]
+      }
+    ]
+  },
+
+  "manutencao_preventiva": {
+    "diario": [
+      "Verificar temperatura interna vs set point em todos os equipamentos",
+      "Confirmar que ciclos de degelo ocorreram nos horários configurados",
+      "Verificar ausência de alarmes ativos na Plataforma Galileo",
+      "Verificar integridade visual da vedação das portas"
+    ],
+    "semanal": [
+      "Limpar grades do condensador — prioritário em açougue e peixaria",
+      "Verificar nível de geada no evaporador",
+      "Checar corrente do compressor com alicate amperímetro",
+      "Verificar tensão de alimentação com multímetro"
+    ],
+    "mensal": [
+      "Limpeza profunda do condensador com produto desengraxante",
+      "Verificar pressões de sucção e descarga com manifold",
+      "Inspecionar borrachas de vedação das portas",
+      "Verificar funcionamento e limpeza de todos os ventiladores",
+      "Calibrar sensores de temperatura",
+      "Revisar configurações de set point e degelo no CLP",
+      "Verificar e limpar bandeja e dreno de drenagem do degelo"
+    ],
+    "trimestral": [
+      "Verificar carga de gás refrigerante R-404A",
+      "Inspecionar tubulações em busca de micro-vazamentos",
+      "Testar capacitores do compressor e ventiladores",
+      "Verificar estado do filtro secador",
+      "Lubrificar dobradiças e verificar alinhamento das portas",
+      "Testar sistema de alarme e comunicação BOS/Galileo"
+    ]
+  },
+
+  "formato_diagnostico_humanizado": {
+    "descricao": "Estrutura que o RAG deve usar ao gerar diagnósticos para o operador",
+    "campos": {
+      "resumo_simples":     "Explicação em linguagem clara para o gerente da loja (sem termos técnicos)",
+      "causa_provavel":     "Causa mais provável baseada nos alarmes e telemetria analisados",
+      "urgencia":           "EMERGENCIA | CRITICA | ALTA | MEDIA | BAIXA | INFORMATIVO",
+      "equipamento_afetado":"Nome + tag do equipamento",
+      "produtos_em_risco":  "Lista de produtos com risco de perda baseada no tipo do equipamento",
+      "proxima_acao":       "O que fazer AGORA — ação imediata",
+      "codigo_alarme":      "Referência ao código consultado (ex: AL-02)",
+      "chamado_aberto":     "true | false",
+      "numero_chamado":     "ID retornado pela API Galileo se chamado foi aberto",
+      "time_to_failure":    "Estimativa em minutos/horas baseada na combinação de alarmes",
+      "nota_seguranca":     "SISTEMA READ-ONLY — IA não executa ações no CLP"
+    }
+  }
+}
