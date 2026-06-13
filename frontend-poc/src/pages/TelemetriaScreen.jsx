@@ -7,7 +7,7 @@ import { Topbar, PageHead, Pill, Modal } from '../components/ui';
 import { Histogram, VBars, Sparkline } from '../components/charts';
 import { useFilters, RANGES } from '../context/FiltersContext';
 import * as D from '../utils/mockData';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const statusColor = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)' };
 
@@ -18,11 +18,53 @@ export function TelemetriaScreen({
   const critica = !!analise?.tem_anomalia_critica;
   const statusCor = critica ? 'var(--red)' : 'var(--green)';
 
-  // série ilustrativa recalculada conforme a janela de tempo selecionada (1h/24h/7d/30d) —
-  // o backend não expõe mais a série bruta, apenas o resumo da análise.
-  const { data: CHART_DATA, anomalyIdx, setpoint } = useMemo(() => D.telemetriaPorRange(range), [range]);
-  const anomalyPoint = critica ? CHART_DATA[anomalyIdx] : null;
+  const [dispositivos, setDispositivos] = useState([]);
+  const [telemetria, setTelemetria] = useState(null);
+  const [loadingTelemetria, setLoadingTelemetria] = useState(true);
+  const [erroTelemetria, setErroTelemetria] = useState(null);
   const [grelha, setGrelha] = useState(false);
+
+  // Lista de equipamentos cadastrados na API Galileo, para o seletor de dispositivo
+  useEffect(() => {
+    fetch('http://localhost:8000/dispositivos')
+      .then((res) => {
+        if (!res.ok) throw new Error('Falha ao buscar dispositivos.');
+        return res.json();
+      })
+      .then((lista) => {
+        setDispositivos(lista);
+        // se o dispositivo atual (valor inicial mockado) não existir na lista real, seleciona o primeiro
+        if (lista.length > 0 && !lista.some((d) => String(d.id) === String(dispositivoId))) {
+          setDispositivoId(String(lista[0].id));
+        }
+      })
+      .catch((error) => console.error('Erro ao buscar dispositivos:', error));
+  }, []);
+
+  // Telemetria ao vivo do dispositivo selecionado, vinda da API Galileo
+  useEffect(() => {
+    if (!dispositivoId) return;
+    setLoadingTelemetria(true);
+    setErroTelemetria(null);
+    fetch(`http://localhost:8000/telemetria/${dispositivoId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Falha ao buscar telemetria do dispositivo.');
+        return res.json();
+      })
+      .then(setTelemetria)
+      .catch((error) => {
+        console.error('Erro ao buscar telemetria:', error);
+        setErroTelemetria(error.message);
+        setTelemetria(null);
+      })
+      .finally(() => setLoadingTelemetria(false));
+  }, [dispositivoId]);
+
+  const CHART_DATA = telemetria?.data || [];
+  const setpoint = telemetria?.setpoint;
+  const anomalyPoint = critica
+    ? CHART_DATA.find((d) => d.horario === analise?.horario_evento)
+    : null;
 
   return (
     <>
@@ -34,9 +76,12 @@ export function TelemetriaScreen({
             onChange={(e) => setDispositivoId(e.target.value)}
             style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontFamily: 'var(--font-ui)', fontSize: 13, outline: 'none', cursor: 'pointer' }}
           >
-            <option value="10101">ID 10101 — Operação Normal</option>
-            <option value="20202">ID 20202 — Ciclo de Degelo</option>
-            <option value="30663">ID 30663 — Anomalia Crítica</option>
+            {dispositivos.length === 0 && (
+              <option value={dispositivoId}>ID {dispositivoId}</option>
+            )}
+            {dispositivos.map((d) => (
+              <option key={d.id} value={d.id}>ID {d.id} — {d.nome} ({d.loja})</option>
+            ))}
           </select>
         </div>
         <div className="seg">
@@ -50,7 +95,7 @@ export function TelemetriaScreen({
       </Topbar>
       <div className="scroll"><div className="page page-wide">
         <PageHead title="Telemetria ao Vivo"
-          sub={`Ativo monitorado · Balcão Frigorífico · dispositivo ${dispositivoId}`}>
+          sub={`Ativo monitorado · ${telemetria?.nome_equipamento || 'Equipamento'} · ${telemetria?.loja_nome || ''} · dispositivo ${dispositivoId}`}>
           <div className="row">
             {erro
               ? <span className="pill red"><span className="statusdot red" />Erro na análise</span>
@@ -104,7 +149,7 @@ export function TelemetriaScreen({
           <div className="card">
             <div className="card-h">
               <h3>Série temporal — Temperatura</h3>
-              <span className="sub">Amostra ilustrativa · {range}</span>
+              <span className="sub">Telemetria ao vivo · dispositivo {dispositivoId}</span>
               <div className="legend" style={{ marginLeft: 'auto' }}>
                 <span><i style={{ background: 'var(--accent)' }} />Ambiente</span>
                 <span><i style={{ background: 'var(--cyan)' }} />Evaporador</span>
@@ -112,25 +157,35 @@ export function TelemetriaScreen({
               </div>
             </div>
             <div className="card-b">
-              <div style={{ height: 272 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={CHART_DATA}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="horario" stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-                    <YAxis stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 8, color: 'var(--text)' }}
-                      itemStyle={{ color: 'var(--accent)' }}
-                    />
-                    <ReferenceLine y={setpoint} stroke="var(--text-faint)" strokeDasharray="4 4" strokeWidth={1.2} />
-                    <Line name="Temp. Ambiente (°C)" type="monotone" dataKey="temp" stroke="var(--accent)" strokeWidth={2} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
-                    <Line name="Temp. Evaporador (°C)" type="monotone" dataKey="evap" stroke="var(--cyan)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                    {anomalyPoint && (
-                      <ReferenceDot x={anomalyPoint.horario} y={anomalyPoint.temp} r={6} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {erroTelemetria && (
+                <span style={{ color: 'var(--red)', fontSize: 13 }}><Icon name="alert" size={14} /> {erroTelemetria}</span>
+              )}
+              {!erroTelemetria && loadingTelemetria && (
+                <span className="faint" style={{ fontStyle: 'italic' }}>Carregando telemetria…</span>
+              )}
+              {!erroTelemetria && !loadingTelemetria && (
+                <div style={{ height: 272 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={CHART_DATA}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="horario" stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                      <YAxis stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 8, color: 'var(--text)' }}
+                        itemStyle={{ color: 'var(--accent)' }}
+                      />
+                      {setpoint != null && (
+                        <ReferenceLine y={setpoint} stroke="var(--text-faint)" strokeDasharray="4 4" strokeWidth={1.2} />
+                      )}
+                      <Line name="Temp. Ambiente (°C)" type="monotone" dataKey="temp" stroke="var(--accent)" strokeWidth={2} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
+                      <Line name="Temp. Evaporador (°C)" type="monotone" dataKey="evap" stroke="var(--cyan)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                      {anomalyPoint && (
+                        <ReferenceDot x={anomalyPoint.horario} y={anomalyPoint.temp} r={6} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           </div>
 
