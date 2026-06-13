@@ -16,7 +16,6 @@ const systems = [
   { name: 'Sistema Galileo (API)', ok: 'Operacional', state: 'green', meta: '99.98% · 142ms' },
   { name: 'Motor Isolation Forest', ok: 'Operacional', state: 'green', meta: 'lote há 38s' },
   { name: 'Serviço RAG / LlamaIndex', ok: 'Operacional', state: 'green', meta: '7 em fila' },
-  { name: 'Mensageria (RabbitMQ)', ok: 'Operacional', state: 'green', meta: '1.2k msg/min' },
   { name: 'Pipeline ETL (Python)', ok: 'Atenção', state: 'amber', meta: 'atraso 4min' },
 ];
 

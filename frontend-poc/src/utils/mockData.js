@@ -279,7 +279,6 @@ export const usuarios = [
 export const integracoes = [
   { nome: 'API Galileo (telemetria)', tipo: 'REST API', icon: 'server', status: 'green', detalhe: 'Conectado · 142ms', meta: 'sincroniza a cada 60s' },
   { nome: 'Banco de dados (Postgres)', tipo: 'Database', icon: 'inbox', status: 'green', detalhe: 'Conectado · pool 12/20', meta: 'latência média 4ms' },
-  { nome: 'Mensageria (RabbitMQ)', tipo: 'Broker', icon: 'flow', status: 'green', detalhe: 'Conectado · 1.2k msg/min', meta: '3 filas ativas' },
   { nome: 'WhatsApp (API Aumbler)', tipo: 'Webhook', icon: 'bell', status: 'amber', detalhe: 'Pendente de configuração', meta: 'aguardando token de produção' },
   { nome: 'Serviço RAG / LlamaIndex', tipo: 'IA', icon: 'sparkles', status: 'green', detalhe: 'Conectado · 7 em fila', meta: 'modelo gpt-4o-mini' },
 ];
