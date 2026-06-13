@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Topbar, PageHead, Kpi, Pill, TipoPill, PrioPill, Modal } from '../components/ui';
-import { Sparkline } from '../components/charts';
 import * as D from '../utils/mockData';
 
 const actions = [
@@ -22,8 +21,6 @@ const systems = [
 ];
 
 export function PaginaInicial({ setTelaAtiva }) {
-  const sp = (seed, color) => <Sparkline data={D.series(seed, 24, 50, 20)} color={color} width={120} height={40} />;
-
   const [modal, setModal] = useState(null);
   const [semTecnico, setSemTecnico] = useState(() => D.chamados.filter((c) => c.tecnico === '—').slice(0, 5));
   const [atrasadas, setAtrasadas] = useState(() => D.manutencoes.filter((m) => m.atraso));
@@ -60,25 +57,21 @@ export function PaginaInicial({ setTelaAtiva }) {
         <div className="kpis">
           <Kpi icon="cpu" label="Equipamentos monitorados" value="142"
             sub={<span className="delta up"><Icon name="arrowUp" size={12} />138 operacionais</span>}
-            spark={sp(1, 'var(--accent)')}
             foot={[{ value: '138', label: 'Ativos', color: 'var(--green)' },
               { value: '4', label: 'Em falha', color: 'var(--red)' },
               { value: '3', label: 'Manut.', color: 'var(--amber)' }]} />
           <Kpi icon="file" label="Chamados ativos" value="27" accent="--amber"
             sub={<span className="delta up"><Icon name="arrowUp" size={12} />+12 esta semana</span>}
-            spark={sp(2, 'var(--amber)')}
             foot={[{ value: '5', label: 'Críticos', color: 'var(--red)' },
               { value: '11', label: 'Andamento', color: 'var(--amber)' },
               { value: '3', label: 'Aprovação', color: 'var(--purple)' }]} />
           <Kpi icon="sparkles" label="Anomalias detectadas (IA)" value="19" accent="--red"
             sub={<span className="faint">Isolation Forest · LightGBM · RAG</span>}
-            spark={sp(3, 'var(--red)')}
             foot={[{ value: '12', label: 'Falhas reais', color: 'var(--red)' },
               { value: '7', label: 'Falsos pos.', color: 'var(--text-dim)' },
               { value: '4', label: 'Score alto', color: 'var(--amber)' }]} />
           <Kpi icon="users" label="Utilizadores do sistema" value="34" accent="--cyan"
             sub={<span className="delta flat">estável</span>}
-            spark={sp(4, 'var(--cyan)')}
             foot={[{ value: '18', label: 'Técnicos' },
               { value: '10', label: 'Superv.' },
               { value: '6', label: 'Admins' }]} />
