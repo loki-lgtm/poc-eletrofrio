@@ -29,9 +29,9 @@ app.add_middleware(
 
 BASE_URL = "https://credenciamento.eletrofrio.com.br:5900/galileo/api/api_hackathon"
 
-# Integração WhatsApp (Evolution API / Umbler) 
-UMBLER_API_URL = "https://app-utalk.umbler.com/api/v1/messages/send-text"
-UMBLER_API_KEY = "SUA_API_KEY"
+# Integração WhatsApp (Evolution API / Umbler) — preencher com os dados reais da instância
+UMBLER_API_URL = "https://app-utalk.umbler.com/api/v1/messages/"
+UMBLER_API_KEY = "Eletrofrio-2026-06-12-2094-06-30--63071A27BF3847D85FC46B49B374E785290E16BCE5207E058C5905E38D6455BA"
 
 # Estado da conversa do atendimento automático, por número de telefone
 ESTADO_CONVERSA: Dict[str, int] = {}
@@ -363,26 +363,32 @@ async def ia_diagnostico_tecnico(dados: dict, loja_nome: str, sazonalidade: str,
         return "Erro ao contatar Especialista IA. Verifique sensores de temperatura e válvula presencialmente."
 
 
-async def enviar_mensagem_whatsapp(numero_destino: str, texto: str) -> bool:
-    """Envia uma mensagem de texto via API da Umbler (padrão Evolution API)."""
+# 1. ATUALIZE A FUNÇÃO DE ENVIO (Com a estrutura descoberta no Swagger)
+async def enviar_mensagem_whatsapp(chat_id: str, texto: str) -> bool:
+    """Envia uma mensagem de texto via API da Umbler (uTalk)."""
+    
     payload = {
-        "number": numero_destino,
-        "text": texto,
-        "options": {
-            "delay": 1200,
-            "presence": "composing"
-        }
+        "message": texto,
+        "organizationId": "aituRyQ8P2Hg3b8e",
+        "chatId": chat_id
     }
-    headers = {"apikey": UMBLER_API_KEY}
+    
+    url_correta = UMBLER_API_URL 
+    headers = {
+        "apikey": UMBLER_API_KEY,
+        "Content-Type": "application/json"
+    }
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
-            response = await client.post(UMBLER_API_URL, json=payload, headers=headers)
+            response = await client.post(url_correta, json=payload, headers=headers)
+            logger.info(f"Status Code da API: {response.status_code}")
+            logger.info(f"Resposta da API: {response.text}")
             response.raise_for_status()
-            logger.info(f"Mensagem WhatsApp enviada para {numero_destino}")
+            logger.info(f"Mensagem WhatsApp enviada com sucesso para o chat {chat_id}")
             return True
         except httpx.HTTPError as exc:
-            logger.error(f"Erro ao enviar mensagem WhatsApp para {numero_destino}: {exc}")
+            logger.error(f"Erro ao enviar mensagem WhatsApp para {chat_id}: {exc}")
             return False
 
 
@@ -630,8 +636,8 @@ async def gerar_diagnostico_sob_demanda(pedido: ResumoTecnicoRequest):
 @app.post("/webhook/whatsapp")
 async def whatsapp_receptor(request: Request):
     """
-    Webhook da Umbler (padrão Evolution API). Recebe a mensagem do cliente,
-    avança a máquina de estados do atendimento e responde via WhatsApp.
+    Webhook da Umbler. Recebe a mensagem do cliente, extrai o chatId,
+    avança a máquina de estados e responde.
     """
     try:
         payload = await request.json()
@@ -639,26 +645,33 @@ async def whatsapp_receptor(request: Request):
         logger.error(f"Payload inválido recebido no webhook do WhatsApp: {exc}")
         raise HTTPException(status_code=400, detail="Payload inválido")
 
+    logger.info(f"Payload recebido do uTalk: {json.dumps(payload, indent=2)}")
+
     dados_mensagem = payload.get("data", {})
     chave = dados_mensagem.get("key", {})
-
-    numero_cliente = chave.get("remoteJid")
+    
+    identificador_cliente = chave.get("remoteJid")
     mensagem_cliente = dados_mensagem.get("message", {}).get("conversation")
+    enviado_pelo_bot = chave.get("fromMe", False)
 
-    # Ignora mensagens enviadas pelo próprio bot ou eventos sem texto
-    if chave.get("fromMe") or not numero_cliente or not mensagem_cliente:
-        logger.info("Webhook ignorado: sem número/mensagem de texto ou enviado pelo próprio bot.")
+    if not identificador_cliente:
+        identificador_cliente = payload.get("chatId")
+        mensagem_cliente = payload.get("message")
+        enviado_pelo_bot = payload.get("fromMe", False)
+
+    if enviado_pelo_bot or not identificador_cliente or not mensagem_cliente:
+        logger.info("Webhook ignorado: sem ID/mensagem de texto ou enviado pelo próprio bot.")
         return {"status": "ignorado"}
 
-    logger.info(f"Mensagem recebida de {numero_cliente}: {mensagem_cliente}")
+    logger.info(f"Mensagem recebida do chat {identificador_cliente}: {mensagem_cliente}")
 
     try:
-        resposta = ia_atendimento_whatsapp(numero_cliente, mensagem_cliente)
+        resposta = ia_atendimento_whatsapp(identificador_cliente, mensagem_cliente)
     except Exception as exc:
-        logger.error(f"Erro ao processar atendimento de {numero_cliente}: {exc}")
+        logger.error(f"Erro ao processar atendimento: {exc}")
         resposta = "Desculpe, tivemos uma instabilidade no atendimento. Por favor, tente novamente em alguns instantes."
 
-    enviado = await enviar_mensagem_whatsapp(numero_cliente, resposta)
+    enviado = await enviar_mensagem_whatsapp(identificador_cliente, resposta)
 
     return {"status": "processado" if enviado else "erro_envio", "resposta_ia": resposta}
 
