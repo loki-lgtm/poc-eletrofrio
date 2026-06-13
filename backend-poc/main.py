@@ -356,7 +356,7 @@ async def ia_diagnostico_tecnico(dados: dict, loja_nome: str, sazonalidade: str,
     2. **Ação Inicial:** [O que o técnico deve testar fisicamente na {loja_nome}]
     """
     try:
-        response = await AsyncClient().chat(model='llama3.1:3b', messages=[{"role": "user", "content": prompt}])
+        response = await AsyncClient().chat(model='llama3.2:3b', messages=[{"role": "user", "content": prompt}])
         return response['message']['content']
     except Exception as e:
         logger.error(f"Erro no Ollama: {e}")
