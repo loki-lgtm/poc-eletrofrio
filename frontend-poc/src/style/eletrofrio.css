@@ -5,41 +5,41 @@
    ============================================================ */
 
 :root {
-  /* Surfaces — cool slate, layered */
-  --bg:            #080c15;
-  --surface:       #0d1422;
-  --surface-2:     #111a2b;
-  --surface-3:     #16223a;
-  --hover:         rgba(148, 163, 184, 0.055);
-  --hover-strong:  rgba(148, 163, 184, 0.10);
+  /* Surfaces — light/white */
+  --bg:            #f0f4f8;
+  --surface:       #ffffff;
+  --surface-2:     #f8fafc;
+  --surface-3:     #eef2f7;
+  --hover:         rgba(0, 0, 0, 0.04);
+  --hover-strong:  rgba(0, 0, 0, 0.07);
 
   /* Borders */
-  --border:        #1c2942;
-  --border-2:      #243352;
-  --border-strong: #33425e;
+  --border:        #e2e8f0;
+  --border-2:      #cbd5e1;
+  --border-strong: #94a3b8;
 
   /* Text */
-  --text:          #eef2f8;
-  --text-dim:      #93a1b8;
-  --text-faint:    #5e6e88;
+  --text:          #0f172a;
+  --text-dim:      #475569;
+  --text-faint:    #94a3b8;
 
-  /* Accent — cooler blue */
-  --accent:        #3d82f6;
-  --accent-2:      #2563eb;
-  --accent-soft:   rgba(61, 130, 246, 0.13);
-  --accent-line:   rgba(61, 130, 246, 0.35);
+  /* Accent — blue */
+  --accent:        #2563eb;
+  --accent-2:      #1d4ed8;
+  --accent-soft:   rgba(37, 99, 235, 0.09);
+  --accent-line:   rgba(37, 99, 235, 0.30);
 
   /* Status */
-  --green:      #2ecf80;
-  --green-soft: rgba(46, 207, 128, 0.13);
-  --red:        #f0556b;
-  --red-soft:   rgba(240, 85, 107, 0.13);
-  --amber:      #f5a524;
-  --amber-soft: rgba(245, 165, 36, 0.13);
-  --cyan:       #2bc4d8;
-  --cyan-soft:  rgba(43, 196, 216, 0.13);
-  --purple:     #9a7bf5;
-  --purple-soft:rgba(154, 123, 245, 0.13);
+  --green:      #16a34a;
+  --green-soft: rgba(22, 163, 74, 0.10);
+  --red:        #dc2626;
+  --red-soft:   rgba(220, 38, 38, 0.10);
+  --amber:      #d97706;
+  --amber-soft: rgba(217, 119, 6, 0.10);
+  --cyan:       #0891b2;
+  --cyan-soft:  rgba(8, 145, 178, 0.10);
+  --purple:     #7c3aed;
+  --purple-soft:rgba(124, 58, 237, 0.10);
 
   /* Type */
   --font-ui:   "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -49,7 +49,7 @@
   --radius-sm: 7px;
   --radius-lg: 14px;
 
-  --shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.6);
+  --shadow:    0 1px 3px rgba(0,0,0,0.08), 0 4px 16px -4px rgba(0,0,0,0.10);
 
   --sidebar-w: 248px;
   --topbar-h:  60px;
@@ -78,10 +78,10 @@ body {
 /* Scrollbars */
 *::-webkit-scrollbar { width: 11px; height: 11px; }
 *::-webkit-scrollbar-thumb {
-  background: #243352; border-radius: 99px;
+  background: #cbd5e1; border-radius: 99px;
   border: 3px solid transparent; background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: #33425e; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
 *::-webkit-scrollbar-track { background: transparent; }
 
 /* ============================================================
@@ -107,7 +107,7 @@ body {
 
 /* ---------- Sidebar ---------- */
 .sidebar {
-  background: linear-gradient(180deg, #0b1220, #080c15);
+  background: #ffffff;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -153,7 +153,7 @@ body {
 }
 .sb-item svg { width: 17px; height: 17px; flex-shrink: 0; opacity: .85; }
 .sb-item:hover { background: var(--hover); color: var(--text); }
-.sb-item.active { background: var(--accent-soft); color: #cfe0ff; font-weight: 600; }
+.sb-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .sb-item.active svg { opacity: 1; color: var(--accent); }
 .sb-item.active::before {
   content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px;
@@ -192,7 +192,7 @@ body {
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px;
-  background: rgba(8, 12, 21, 0.7);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(8px);
 }
 .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-faint); }
@@ -403,7 +403,7 @@ body {
 .inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .inp.mono { font-family: var(--font-mono); }
 textarea.inp { height: auto; padding: 9px 11px; resize: vertical; line-height: 1.5; }
-select.inp { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235e6e88' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+select.inp { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
 
 .switch {
   width: 38px; height: 22px; border-radius: 99px; flex-shrink: 0;
@@ -428,7 +428,7 @@ select.inp { appearance: none; cursor: pointer; background-image: url("data:imag
   font-size: 13px; color: var(--text-dim); cursor: pointer; font-weight: 500; margin: 1px 0;
 }
 .settings-nav .sn:hover { background: var(--hover); color: var(--text); }
-.settings-nav .sn.on { background: var(--accent-soft); color: #cfe0ff; font-weight: 600; }
+.settings-nav .sn.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .settings-nav .sn svg { width: 16px; height: 16px; }
 
 /* method / key badges */
