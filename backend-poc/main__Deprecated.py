@@ -267,18 +267,30 @@ def processar_telemetria(dados_json: dict) -> pd.DataFrame:
         return pd.DataFrame()
 
 def motor_isolation_forest(df: pd.DataFrame) -> dict:
-    """Aplica o algoritmo de detecção e a regra de negócio do Degelo."""
+    """Aplica o algoritmo multivariado para prever esforço mecânico e anomalias."""
     colunas_obrigatorias = ["Temperatura Ambiente", "Status Degelo", "Abertura de válvula %", "L1 - Superaquecimento"]
     
-    for col in ["Temperatura Ambiente", "Status Degelo"]:
+    for col in colunas_obrigatorias:
         if col not in df.columns:
             return {"critico": False}
 
-    X = df[["Temperatura Ambiente"]]
+    # 1. Feature Engineering: Criar a variável Tempo para capturar Sazonalidade
+    try:
+        # Transforma "14:30" em 870 (minutos do dia) para o ML entender padrões de horário
+        df['minutos_do_dia'] = df['horario'].apply(lambda x: int(str(x).split(':')[0]) * 60 + int(str(x).split(':')[1]))
+    except:
+        df['minutos_do_dia'] = 0
+
+    # 2. Matriz Multivariada (Temperatura + Válvula + Superaquecimento + Tempo)
+    X = df[["Temperatura Ambiente", "Abertura de válvula %", "L1 - Superaquecimento", "minutos_do_dia"]].copy()
+    
+    # Preenchimento de segurança para evitar quebra no Scikit-Learn
+    X = X.ffill().bfill().fillna(0)
 
     modelo = IsolationForest(contamination=0.10, random_state=42)
     df["ml_score"] = modelo.fit_predict(X)
 
+    # Regra: Anomalia estatística (qualquer uma das variáveis estourou) E não é Degelo
     df["alerta_real"] = df.apply(
         lambda row: True if (row["ml_score"] == -1 and float(row["Status Degelo"]) == 0.0) else False, 
         axis=1
@@ -287,19 +299,27 @@ def motor_isolation_forest(df: pd.DataFrame) -> dict:
     eventos_criticos = df[df["alerta_real"] == True]
     
     if not eventos_criticos.empty:
-        # Pega o index da última linha crítica
         idx_ultimo = eventos_criticos.index[-1]
         ultimo = eventos_criticos.loc[idx_ultimo]
         
-        # Pega a janela dos últimos 30 minutos (6 leituras) até o momento da falha
-        # O max(0, idx_ultimo - 5) garante que não dê erro se a falha for logo no início do DataFrame
         janela_30min = df.loc[max(0, idx_ultimo - 5) : idx_ultimo]
         
-        # Coleta os valores do minuto exato
+        # 3. Cálculo de Degradação (A válvula está perdendo eficiência?)
+        if len(janela_30min) > 1:
+            valvula_inicio = janela_30min.iloc[0]["Abertura de válvula %"]
+            valvula_fim = janela_30min.iloc[-1]["Abertura de válvula %"]
+            if valvula_fim > valvula_inicio + 15: # Crescimento brusco de 15% na janela
+                tendencia_esforco = "CRESCENTE CRÍTICA (Perda rápida de eficiência)"
+            elif valvula_fim > valvula_inicio:
+                tendencia_esforco = "CRESCENTE (Sobrecarga progressiva)"
+            else:
+                tendencia_esforco = "ESTÁVEL / DECRESCENTE"
+        else:
+            tendencia_esforco = "Dados Insuficientes"
+
         valvula = ultimo.get("Abertura de válvula %", 0.0)
         superaq = ultimo.get("L1 - Superaquecimento", 0.0)
         
-        # Calcula as médias da janela
         temp_media = janela_30min["Temperatura Ambiente"].mean()
         valvula_media = janela_30min.get("Abertura de válvula %", pd.Series([0.0])).mean()
         superaq_medio = janela_30min.get("L1 - Superaquecimento", pd.Series([0.0])).mean()
@@ -314,53 +334,56 @@ def motor_isolation_forest(df: pd.DataFrame) -> dict:
             "score": ultimo["ml_score"],
             "temperatura_media_30min": round(temp_media, 2),
             "valvula_media_30min": round(valvula_media, 2),
-            "superaquecimento_medio_30min": round(superaq_medio, 2)
+            "superaquecimento_medio_30min": round(superaq_medio, 2),
+            "tendencia_esforco": tendencia_esforco # <-- Nova métrica preditiva
         }
         
     return {"critico": False}
+
 
 # 3. SERVIÇO DE IA (AGENTES LLM - SMART PROMPTING)
 async def ia_diagnostico_tecnico(dados: dict, loja_nome: str, sazonalidade: str, rag_contexto: Optional[dict] = None) -> str:
     nome_maquina = dados.get('nome_equipamento', 'Equipamento de Refrigeração')
     contexto_rag_txt = formatar_contexto_rag(rag_contexto)
+    tendencia = dados.get('tendencia_esforco', 'Desconhecida')
 
     prompt = f"""
     Aja como um Engenheiro de Refrigeração Industrial Sênior da Eletrofrio.
-    O seu objetivo é analisar dados de telemetria num ambiente de simulação e diagnóstico seguro para técnicos credenciados. Não há riscos físicos.
+    O seu objetivo é realizar manutenção preditiva e evitar a perda de alimentos.
 
     LOCALIZAÇÃO E CONTEXTO:
     - Loja: {loja_nome}
     - Equipamento: {nome_maquina}
     - Contexto de Sazonalidade: {sazonalidade}
 
-    DADOS NO MINUTO DA FALHA ({dados['horario']}):
+    DADOS NO MINUTO DO ALERTA ({dados['horario']}):
     - Temperatura Ambiente: {dados['temperatura']}°C
-    - Abertura da Válvula de Expansão: {dados['valvula']}%
+    - Abertura da Válvula: {dados['valvula']}%
     - Superaquecimento: {dados['superaquecimento']}K
-    - Status Degelo: {dados['degelo']} (0 = Desligado)
+    - Degelo: {dados['degelo']}
 
-    TENDÊNCIA (MÉDIA DOS ÚLTIMOS 30 MIN):
-    - Temperatura: {dados['temperatura_media_30min']}°C | Válvula: {dados['valvula_media_30min']}% | Superaquecimento: {dados['superaquecimento_medio_30min']}K
+    ANÁLISE DE TENDÊNCIA E ESFORÇO MECÂNICO (MÉDIA 30 MIN):
+    - Temperatura Média: {dados['temperatura_media_30min']}°C | Válvula Média: {dados['valvula_media_30min']}%
+    - Comportamento da Válvula de Expansão: {tendencia}
 
-    CONTEXTO TÉCNICO (BASE RAG ELETROFRIO):
+    CONTEXTO TÉCNICO (RAG):
     {contexto_rag_txt}
 
-    INSTRUÇÕES TÉCNICAS:
-    1. Não invente fluidos fictícios. Utilize estritamente vocabulário de refrigeração comercial.
-    2. Anomalias na "Madrugada (Loja Fechada)" descartam portas abertas por clientes, apontando para desvios mecânicos ou elétricos.
-    3. Válvula alta e superaquecimento alto crónicos indicam baixa carga de fluido refrigerante ou restrição no circuito.
-    4. Use o contexto técnico da base RAG (set point, faixa operacional, normativa, alarme e causas) para fundamentar o diagnóstico.
-
-    Responda ESTRITAMENTE em 2 tópicos, sem saudações ou avisos adicionais:
-    1. **Causa Mais Provável:** [Análise técnica cruzando os dados, a sazonalidade e o contexto RAG]
-    2. **Ação Inicial:** [O que o técnico deve testar fisicamente na {loja_nome}]
+    INSTRUÇÕES PREDITIVAS RIGOROSAS:
+    1. O algoritmo identificou um padrão anômalo. Se a temperatura está dentro do Set Point, mas a válvula e o superaquecimento estão altos ou em tendência "CRESCENTE", o compressor está em sobrecarga prestes a falhar.
+    2. Diagnostique preventivamente focando no tempo de vida útil restante da mercadoria e do hardware.
+    
+    Responda ESTRITAMENTE nestes 3 tópicos, sem introduções:
+    1. **Causa Raiz Mais Provável:** [Análise técnica do desvio]
+    2. **Previsão de Impacto:** [Se não houver intervenção imediata, qual será o impacto na mercadoria/hardware nas próximas horas?]
+    3. **Ação Preventiva Imediata:** [Diretriz técnica para o especialista em campo]
     """
     try:
-        response = await AsyncClient().chat(model='llama3.2:3b', messages=[{"role": "user", "content": prompt}])
+        response = await AsyncClient().chat(model='llama3.2', messages=[{"role": "user", "content": prompt}])
         return response['message']['content']
     except Exception as e:
         logger.error(f"Erro no Ollama: {e}")
-        return "Erro ao contatar Especialista IA. Verifique sensores de temperatura e válvula presencialmente."
+        return "Erro de conexão LLM. Aja imediatamente conforme o código de alarme no painel."
 
 
 # 1. ATUALIZE A FUNÇÃO DE ENVIO (Com a estrutura descoberta no Swagger)
@@ -674,6 +697,7 @@ async def whatsapp_receptor(request: Request):
     enviado = await enviar_mensagem_whatsapp(identificador_cliente, resposta)
 
     return {"status": "processado" if enviado else "erro_envio", "resposta_ia": resposta}
+
 
 @app.get("/saude")
 async def health_check():
