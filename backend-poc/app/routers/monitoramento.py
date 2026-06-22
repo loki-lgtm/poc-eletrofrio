@@ -1,20 +1,25 @@
 """
-Router: status de monitoramento preditivo, por dispositivo.
+Router: status de monitoramento preditivo.
 
-Reaproveita a mesma classificação por ETA do "módulo fantasma"
-(app/services/monitoramento.py), mas SOB-DEMANDA e SEM efeitos colaterais —
-não aciona a LLM nem abre chamado. É só leitura, pensado pra alimentar o
-card "Estado dos sistemas" do painel sem reativar a automação completa
-(LLM + abertura de chamado em background), que continua desligada por
-decisão de produto até ser validada com mais calma.
+`/monitoramento/status` reaproveita a mesma classificação por ETA do
+scheduler em background (app/services/monitoramento.py), mas SOB-DEMANDA —
+não aciona a LLM nem abre chamado, é só leitura/visualização (consulta a
+Galileo de novo, então demora alguns segundos).
+
+`/monitoramento/agenda` é diferente: não toca a Galileo, só lê o estado em
+memória do ciclo automático real (ESTADO_CICLO em app/services/monitoramento.py)
+— pensado pra ser chamado com frequência (ex: a cada poucos segundos) pra
+alimentar um countdown no front sem custo de rede.
 """
 import asyncio
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter
 
 from app.config import INTERVALO_MONITORAMENTO_MIN, JANELA_REGRESSAO_PONTOS, LIMIAR_CRITICO_MINUTOS, MAX_CONCORRENCIA_MONITOR
 from app.core.logging import logger
+from app.services import monitoramento as monitoramento_service
 from app.services.eletrofrio_api import fetch_api, obter_contexto_dispositivo
 from app.services.eta import calcular_eta_falha
 from app.services.rag import encontrar_tipo_equipamento
@@ -86,3 +91,23 @@ async def status_monitoramento():
         resumo[r["estado"]] = resumo.get(r["estado"], 0) + 1
 
     return {"total": len(resultados), "resumo": resumo, "dispositivos": resultados}
+
+
+@router.get("/monitoramento/agenda")
+async def agenda_monitoramento():
+    """Estado do ciclo automático em background — leitura instantânea, sem chamar a API Galileo."""
+    estado = monitoramento_service.ESTADO_CICLO
+
+    proxima_execucao = None
+    if estado["scheduler_ativo"] and estado["ultimo_inicio"]:
+        proxima_execucao = estado["ultimo_inicio"] + timedelta(minutes=INTERVALO_MONITORAMENTO_MIN)
+
+    return {
+        "scheduler_ativo": estado["scheduler_ativo"],
+        "intervalo_minutos": INTERVALO_MONITORAMENTO_MIN,
+        "ultimo_inicio": estado["ultimo_inicio"].isoformat() if estado["ultimo_inicio"] else None,
+        "ultimo_fim": estado["ultimo_fim"].isoformat() if estado["ultimo_fim"] else None,
+        "proxima_execucao": proxima_execucao.isoformat() if proxima_execucao else None,
+        "ultimo_erro": estado["ultimo_erro"],
+        "dispositivos_avaliados": estado["dispositivos_avaliados"],
+    }

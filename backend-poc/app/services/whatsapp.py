@@ -4,20 +4,50 @@ Serviço de atendimento automático via WhatsApp (Umbler uTalk).
 Responsável por:
 - Enviar mensagens de texto pela API da Umbler (enviar_mensagem_whatsapp)
 - Conduzir a máquina de estados da conversa (ia_atendimento_whatsapp)
+- Restringir o atendimento à allowlist de números (numero_autorizado)
 """
+import re
 from typing import Dict
 
 import httpx
 
-from app.config import UMBLER_API_KEY, UMBLER_API_URL, UMBLER_ORGANIZATION_ID
+from app.config import (
+    UMBLER_API_KEY,
+    UMBLER_API_URL,
+    UMBLER_ORGANIZATION_ID,
+    WHATSAPP_NUMEROS_PERMITIDOS,
+)
 from app.core.logging import logger
 
 # Estado da conversa do atendimento automático, por número de telefone / chatId.
 ESTADO_CONVERSA: Dict[str, int] = {}
 
 
+def _somente_digitos(identificador: str) -> str:
+    """Remove tudo que não é dígito — útil pra comparar remoteJid ("5541...@s.whatsapp.net"),
+    chatId ou número puro sem se preocupar com formato/sufixo/DDI."""
+    return re.sub(r"\D", "", identificador or "")
+
+
+def numero_autorizado(identificador: str) -> bool:
+    """Confere se o identificador (remoteJid/chatId/número) bate com algum da allowlist,
+    comparando só os dígitos finais — não importa se vem com 55 (DDI) na frente ou não."""
+    digitos = _somente_digitos(identificador)
+    if not digitos:
+        return False
+    return any(digitos.endswith(_somente_digitos(n)) for n in WHATSAPP_NUMEROS_PERMITIDOS)
+
+
 async def enviar_mensagem_whatsapp(chat_id: str, texto: str) -> bool:
     """Envia uma mensagem de texto via API da Umbler (uTalk)."""
+    if not numero_autorizado(chat_id):
+        logger.warning(f"[WhatsApp] Envio bloqueado — {chat_id} não está na allowlist {WHATSAPP_NUMEROS_PERMITIDOS}.")
+        return False
+
+    if not UMBLER_API_KEY:
+        logger.error("[WhatsApp] UMBLER_API_KEY vazia — configure o .env antes de enviar mensagens de verdade.")
+        return False
+
     payload = {
         "message": texto,
         "organizationId": UMBLER_ORGANIZATION_ID,

@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, HTTPException, Request
 
 from app.core.logging import logger
-from app.services.whatsapp import enviar_mensagem_whatsapp, ia_atendimento_whatsapp
+from app.services.whatsapp import enviar_mensagem_whatsapp, ia_atendimento_whatsapp, numero_autorizado
 
 router = APIRouter(tags=["WhatsApp"])
 
@@ -38,6 +38,10 @@ async def whatsapp_receptor(request: Request):
     if enviado_pelo_bot or not identificador_cliente or not mensagem_cliente:
         logger.info("Webhook ignorado: sem ID/mensagem de texto ou enviado pelo próprio bot.")
         return {"status": "ignorado"}
+
+    if not numero_autorizado(identificador_cliente):
+        logger.info(f"Webhook ignorado: {identificador_cliente} não está na allowlist de números.")
+        return {"status": "ignorado_numero_nao_autorizado"}
 
     logger.info(f"Mensagem recebida do chat {identificador_cliente}: {mensagem_cliente}")
 

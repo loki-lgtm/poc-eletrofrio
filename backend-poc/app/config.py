@@ -28,6 +28,13 @@ UMBLER_API_URL = os.getenv(
 UMBLER_API_KEY = os.getenv("UMBLER_API_KEY", "")
 UMBLER_ORGANIZATION_ID = os.getenv("UMBLER_ORGANIZATION_ID", "aituRyQ8P2Hg3b8e")
 
+# Allowlist de números — enquanto em testes, só este número manda/recebe mensagem.
+# Aceita lista separada por vírgula em WHATSAPP_NUMEROS_PERMITIDOS no .env (ex:
+# "41985118423,41999998888"); comparação é só por dígitos (ignora DDI/sufixo de JID).
+WHATSAPP_NUMEROS_PERMITIDOS = [
+    n.strip() for n in os.getenv("WHATSAPP_NUMEROS_PERMITIDOS", "41985118423").split(",") if n.strip()
+]
+
 # Base de conhecimento RAG (manuais técnicos, códigos de alarme, regras de decisão)
 RAG_KB_PATH = BASE_DIR / "data" / "manuais_tecnicos_rag.json"
 

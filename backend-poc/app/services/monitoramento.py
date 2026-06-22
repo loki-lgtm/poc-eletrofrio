@@ -46,6 +46,22 @@ _semaforo = asyncio.Semaphore(MAX_CONCORRENCIA_MONITOR)
 # Estado em memória por dispositivo: {"estado": "ok"|"atencao"|"critico", "ultimo_alerta": datetime|None}
 ESTADO_MONITORAMENTO: Dict[int, dict] = {}
 
+# Estado do ciclo do scheduler em si (não por dispositivo) — alimenta o card de
+# "próxima varredura" no front, sem precisar consultar a API Galileo pra isso.
+ESTADO_CICLO: dict = {
+    "scheduler_ativo": False,
+    "ultimo_inicio": None,  # datetime — também serve de base pra calcular a próxima execução
+    "ultimo_fim": None,
+    "ultimo_erro": None,
+    "dispositivos_avaliados": 0,
+}
+
+
+def registrar_scheduler_iniciado() -> None:
+    """Chamado pelo lifespan do FastAPI quando o scheduler sobe — vira a base do primeiro countdown."""
+    ESTADO_CICLO["scheduler_ativo"] = True
+    ESTADO_CICLO["ultimo_inicio"] = datetime.now()
+
 
 def _valor_seguro(df: pd.DataFrame, coluna: str, default: float = 0.0):
     return df[coluna].iloc[-1] if coluna in df.columns else default
@@ -169,11 +185,25 @@ async def _avaliar_dispositivo(dispositivo_id: int) -> None:
 async def monitoramento_background_preditivo() -> None:
     """Job do scheduler: avalia todos os dispositivos, com concorrência limitada."""
     logger.info("[Monitor] Iniciando ciclo de monitoramento preditivo...")
+    ESTADO_CICLO["ultimo_inicio"] = datetime.now()
+    ESTADO_CICLO["ultimo_erro"] = None
+
     try:
         dispositivos_ids = await _listar_dispositivos_ids()
     except Exception as e:
         logger.error(f"[Monitor] Falha ao listar dispositivos: {e}")
+        ESTADO_CICLO["ultimo_erro"] = f"Falha ao listar dispositivos: {e}"
+        ESTADO_CICLO["ultimo_fim"] = datetime.now()
         return
 
-    await asyncio.gather(*(_avaliar_dispositivo(did) for did in dispositivos_ids))
+    resultados = await asyncio.gather(
+        *(_avaliar_dispositivo(did) for did in dispositivos_ids), return_exceptions=True
+    )
+    erros = [r for r in resultados if isinstance(r, Exception)]
+    if erros:
+        ESTADO_CICLO["ultimo_erro"] = f"{len(erros)} de {len(dispositivos_ids)} dispositivo(s) falharam na avaliação."
+        logger.error(f"[Monitor] {ESTADO_CICLO['ultimo_erro']} Exemplo: {erros[0]}")
+
+    ESTADO_CICLO["dispositivos_avaliados"] = len(dispositivos_ids)
+    ESTADO_CICLO["ultimo_fim"] = datetime.now()
     logger.info(f"[Monitor] Ciclo concluído para {len(dispositivos_ids)} dispositivo(s).")

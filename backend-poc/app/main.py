@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import INTERVALO_MONITORAMENTO_MIN, MONITORAMENTO_ATIVO
 from app.core.logging import logger
 from app.routers import dashboard, dispositivos, health, monitoramento, pipeline, whatsapp
-from app.services.monitoramento import monitoramento_background_preditivo
+from app.services.monitoramento import monitoramento_background_preditivo, registrar_scheduler_iniciado
 
 
 @asynccontextmanager
@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
             id="monitoramento_preditivo",
         )
         scheduler.start()
+        registrar_scheduler_iniciado()
         logger.info(
             f"[Monitor] Scheduler iniciado — ciclo a cada {INTERVALO_MONITORAMENTO_MIN} min."
         )
@@ -44,7 +45,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown()
 
 
-app = FastAPI(title="Motor Preditivo Eletrofrio - IA & IoT")
+app = FastAPI(title="Motor Preditivo Eletrofrio - IA & IoT", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

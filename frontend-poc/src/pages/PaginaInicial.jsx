@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Icon } from '../components/Icon';
 import { Topbar, PageHead, Kpi, Pill, TipoPill, PrioPill, Modal } from '../components/ui';
 import { AnaliseCardsPanel } from '../components/AnaliseCards';
+import { AgendaTimerCard } from '../components/AgendaTimer';
 import * as D from '../utils/mockData';
 
 const actions = [
@@ -215,6 +216,8 @@ export function PaginaInicial({ setTelaAtiva, analise, loadingAnalise, dispositi
                 ))}
               </div>
             </div>
+
+            <AgendaTimerCard />
 
             <div className="card">
               <div className="card-h"><h3>Eficiência energética</h3><span className="sub">OPEX · 24h</span></div>
