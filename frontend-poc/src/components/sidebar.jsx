@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from './Icon';
+
+const SIDEBAR_W_OPEN = '248px';
+const SIDEBAR_W_COLLAPSED = '80px';
 
 const NAV = [
   { items: [{ id: 'home', label: 'Página Inicial', icon: 'home' }] },
@@ -33,10 +36,15 @@ const NAV = [
 
 export function Sidebar({ telaAtiva, setTelaAtiva }) {
   const [expands, setExpands] = useState({ chamados: true, gestao: true });
+  const [collapsed, setCollapsed] = useState(false);
   const toggleExpand = (key) => setExpands((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-w', collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W_OPEN);
+  }, [collapsed]);
+
   return (
-    <aside className="sidebar">
+    <aside className={'sidebar' + (collapsed ? ' collapsed' : '')}>
       <div className="sb-head">
         <div className="sb-logo">
           <Icon name="snow" size={17} style={{ color: '#fff' }} />
@@ -44,6 +52,9 @@ export function Sidebar({ telaAtiva, setTelaAtiva }) {
         <div className="sb-brand">
           <b>Eletrofrio</b>
           <span>Monitoramento · IA</span>
+        </div>
+        <div className="sb-burger" onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>
+          <Icon name="menu" size={17} />
         </div>
       </div>
       <nav className="sb-nav">
@@ -54,7 +65,8 @@ export function Sidebar({ telaAtiva, setTelaAtiva }) {
               <React.Fragment key={it.id}>
                 <div
                   className={'sb-item' + (telaAtiva === it.id ? ' active' : '')}
-                  onClick={() => (it.sub ? toggleExpand(it.subKey) : setTelaAtiva(it.id))}
+                  title={collapsed ? it.label : undefined}
+                  onClick={() => (it.sub && !collapsed ? toggleExpand(it.subKey) : setTelaAtiva(it.id))}
                 >
                   <Icon name={it.icon} size={17} />
                   <span>{it.label}</span>
@@ -67,7 +79,7 @@ export function Sidebar({ telaAtiva, setTelaAtiva }) {
                     />
                   )}
                 </div>
-                {it.sub && expands[it.subKey] && (
+                {it.sub && expands[it.subKey] && !collapsed && (
                   <div className="sb-sub">
                     {it.sub.map((s) => (
                       <div

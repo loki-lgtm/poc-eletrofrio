@@ -29,7 +29,7 @@ app.add_middleware(
 
 BASE_URL = "https://credenciamento.eletrofrio.com.br:5900/galileo/api/api_hackathon"
 
-# Integração WhatsApp (Evolution API / Umbler) — preencher com os dados reais da instância
+# Integração WhatsApp (Evolution API / Umbler) 
 UMBLER_API_URL = "https://app-utalk.umbler.com/api/v1/messages/"
 UMBLER_API_KEY = "Eletrofrio-2026-06-12-2094-06-30--63071A27BF3847D85FC46B49B374E785290E16BCE5207E058C5905E38D6455BA"
 
