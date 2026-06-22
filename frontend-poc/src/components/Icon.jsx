@@ -43,6 +43,7 @@ const ICON_PATHS = {
   pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
   play: '<path d="M7 5v14l11-7Z"/>',
   dot: '<circle cx="12" cy="12" r="3" fill="currentColor"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
 };
 
 export function Icon({ name, size = 18, style, className, strokeWidth = 1.7 }) {
