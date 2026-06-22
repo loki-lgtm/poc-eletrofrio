@@ -13,12 +13,12 @@ const actions = [
     desc: 'intervenções preventivas com prazo vencido', cta: 'Agendar' },
 ];
 
-const systems = [
-  { name: 'Sistema Galileo (API)', ok: 'Operacional', state: 'green', meta: '99.98% · 142ms' },
-  { name: 'Motor Isolation Forest', ok: 'Operacional', state: 'green', meta: 'lote há 38s' },
-  { name: 'Serviço RAG / LlamaIndex', ok: 'Operacional', state: 'green', meta: '7 em fila' },
-  { name: 'Pipeline ETL (Python)', ok: 'Atenção', state: 'amber', meta: 'atraso 4min' },
-];
+const ESTADO_DOT = { critico: 'red', atencao: 'amber', ok: 'green', sem_dados: 'gray', sem_especificacao: 'gray', erro: 'gray' };
+const ESTADO_LABEL = {
+  critico: 'Crítico', atencao: 'Atenção', ok: 'Operacional',
+  sem_dados: 'Sem telemetria', sem_especificacao: 'Sem spec. RAG', erro: 'Erro',
+};
+const PRIORIDADE_ESTADO = { critico: 0, atencao: 1, erro: 2, sem_dados: 3, sem_especificacao: 4, ok: 5 };
 
 export function PaginaInicial({ setTelaAtiva, analise, loadingAnalise, dispositivoId }) {
   const [modal, setModal] = useState(null);
@@ -28,6 +28,9 @@ export function PaginaInicial({ setTelaAtiva, analise, loadingAnalise, dispositi
   const [novaEmpresa, setNovaEmpresa] = useState('');
   const [novaPrioridade, setNovaPrioridade] = useState(D.prioridades[0]);
   const [totalDispositivos, setTotalDispositivos] = useState(null);
+  const [monitoramento, setMonitoramento] = useState(null);
+  const [carregandoMonitor, setCarregandoMonitor] = useState(true);
+  const [erroMonitor, setErroMonitor] = useState(null);
 
   useEffect(() => {
     fetch('http://localhost:8000/dispositivos')
@@ -35,6 +38,23 @@ export function PaginaInicial({ setTelaAtiva, analise, loadingAnalise, dispositi
       .then((lista) => setTotalDispositivos(lista.length))
       .catch(() => setTotalDispositivos(null));
   }, []);
+
+  const buscarMonitoramento = () => {
+    setCarregandoMonitor(true);
+    setErroMonitor(null);
+    fetch('http://localhost:8000/monitoramento/status')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Falha ao consultar /monitoramento/status.'))))
+      .then(setMonitoramento)
+      .catch((e) => setErroMonitor(e.message))
+      .finally(() => setCarregandoMonitor(false));
+  };
+
+  useEffect(() => { buscarMonitoramento(); }, []);
+
+  const dispositivosOrdenados = (monitoramento?.dispositivos || [])
+    .slice()
+    .sort((a, b) => (PRIORIDADE_ESTADO[a.estado] ?? 9) - (PRIORIDADE_ESTADO[b.estado] ?? 9))
+    .slice(0, 6);
 
   const atribuir = (chamadoId, tecnico) => {
     setSemTecnico((prev) => prev.map((c) => (c.id === chamadoId ? { ...c, tecnico } : c)));
@@ -160,18 +180,36 @@ export function PaginaInicial({ setTelaAtiva, analise, loadingAnalise, dispositi
 
           <div className="col" style={{ gap: 16 }}>
             <div className="card">
-              <div className="card-h"><h3>Estado dos sistemas</h3>
-                <span className="pill green" style={{ marginLeft: 'auto' }}><span className="dot" />Online</span></div>
+              <div className="card-h"><h3>Monitoramento preditivo</h3>
+                <span className="sub">ETA por dispositivo · sob-demanda</span>
+                <button className="btn ghost sm" style={{ marginLeft: 'auto' }} onClick={buscarMonitoramento} disabled={carregandoMonitor}>
+                  <Icon name="refresh" size={13} />{carregandoMonitor ? 'Avaliando…' : 'Atualizar'}
+                </button>
+              </div>
+              {monitoramento && !carregandoMonitor && (
+                <div className="row" style={{ gap: 8, padding: '10px 16px 0' }}>
+                  <span className="pill red"><span className="dot" />{monitoramento.resumo.critico} crítico</span>
+                  <span className="pill amber"><span className="dot" />{monitoramento.resumo.atencao} atenção</span>
+                  <span className="pill green"><span className="dot" />{monitoramento.resumo.ok} ok</span>
+                  <span className="faint" style={{ fontSize: 11.5, marginLeft: 'auto' }}>{monitoramento.total} dispositivos</span>
+                </div>
+              )}
               <div className="card-b" style={{ display: 'flex', flexDirection: 'column', gap: 0, padding: '4px 0' }}>
-                {systems.map((s, i) => (
-                  <div className="row" key={i} style={{ justifyContent: 'space-between', padding: '9px 16px', borderBottom: i < systems.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    <div className="row" style={{ gap: 10 }}>
-                      <span className={'statusdot ' + s.state} />
-                      <span style={{ fontSize: 13 }}>{s.name}</span>
+                {carregandoMonitor && (
+                  <span className="faint" style={{ fontStyle: 'italic', padding: '9px 16px' }}>Avaliando ETA de cada dispositivo via API Galileo…</span>
+                )}
+                {erroMonitor && !carregandoMonitor && (
+                  <span style={{ color: 'var(--red)', fontSize: 12.5, padding: '9px 16px' }}><Icon name="alert" size={13} /> {erroMonitor}</span>
+                )}
+                {!carregandoMonitor && !erroMonitor && dispositivosOrdenados.map((s, i) => (
+                  <div className="row" key={s.dispositivo_id} style={{ justifyContent: 'space-between', padding: '9px 16px', borderBottom: i < dispositivosOrdenados.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div className="row" style={{ gap: 10, minWidth: 0 }}>
+                      <span className={'statusdot ' + ESTADO_DOT[s.estado]} />
+                      <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nome}</span>
                     </div>
-                    <div className="col" style={{ alignItems: 'flex-end', lineHeight: 1.2 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: s.state === 'green' ? 'var(--green)' : 'var(--amber)' }}>{s.ok}</span>
-                      <span className="faint mono" style={{ fontSize: 10.5 }}>{s.meta}</span>
+                    <div className="col" style={{ alignItems: 'flex-end', lineHeight: 1.2, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: `var(--${ESTADO_DOT[s.estado] === 'gray' ? 'text-dim' : ESTADO_DOT[s.estado]})` }}>{ESTADO_LABEL[s.estado]}</span>
+                      <span className="faint mono" style={{ fontSize: 10.5 }}>{s.eta_minutos != null ? `ETA ${s.eta_minutos} min` : s.loja || '—'}</span>
                     </div>
                   </div>
                 ))}

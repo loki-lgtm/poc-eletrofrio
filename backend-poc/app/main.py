@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import INTERVALO_MONITORAMENTO_MIN, MONITORAMENTO_ATIVO
 from app.core.logging import logger
-from app.routers import dashboard, dispositivos, health, pipeline, whatsapp
+from app.routers import dashboard, dispositivos, health, monitoramento, pipeline, whatsapp
 from app.services.monitoramento import monitoramento_background_preditivo
 
 
@@ -58,3 +58,4 @@ app.include_router(dispositivos.router)
 app.include_router(dashboard.router)
 app.include_router(whatsapp.router)
 app.include_router(health.router)
+app.include_router(monitoramento.router)
