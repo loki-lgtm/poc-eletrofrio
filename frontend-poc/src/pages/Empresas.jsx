@@ -4,9 +4,28 @@ import { Topbar, PageHead, Kpi, Modal } from '../components/ui';
 import { AtivosTable, ativosKpis } from '../components/AtivosTable';
 import * as D from '../utils/mockData';
 
+let proximoAtivoId = 9000;
+
 export function Empresas({ setTelaAtiva }) {
-  const k = ativosKpis(D.ativos);
+  const [ativos, setAtivos] = useState(D.ativos);
+  const k = ativosKpis(ativos);
   const [novoAtivo, setNovoAtivo] = useState(false);
+  const [nomeAtivo, setNomeAtivo] = useState('');
+  const [empresaAtivo, setEmpresaAtivo] = useState(D.sites[0].name);
+  const [grupoAtivo, setGrupoAtivo] = useState(D.grupos[0].nome);
+
+  const salvarAtivo = () => {
+    if (!nomeAtivo.trim()) return;
+    setAtivos((prev) => [
+      {
+        id: proximoAtivoId++, nome: nomeAtivo, empresa: empresaAtivo, grupo: grupoAtivo,
+        unit: '°C', val: 0, score: 0, status: 'ativo', saude: 'green', statusDot: 'green', ultimaLeitura: '—',
+      },
+      ...prev,
+    ]);
+    setNomeAtivo('');
+    setNovoAtivo(false);
+  };
 
   return (
     <>
@@ -29,7 +48,7 @@ export function Empresas({ setTelaAtiva }) {
         </div>
         <div className="three-col" style={{ marginBottom: 22 }}>
           {D.empresas.map((emp) => {
-            const itens = D.ativos.filter((a) => a.empresa === emp.nome);
+            const itens = ativos.filter((a) => a.empresa === emp.nome);
             const criticos = itens.filter((a) => a.saude === 'red').length;
             return (
               <div className="card" key={emp.id} style={{ padding: '16px 17px' }}>
@@ -49,20 +68,24 @@ export function Empresas({ setTelaAtiva }) {
           })}
         </div>
 
-        <AtivosTable items={D.ativos} showStatus />
+        <AtivosTable items={ativos} showStatus />
       </div></div>
 
       <Modal open={novoAtivo} onClose={() => setNovoAtivo(false)} title="Novo ativo" sub="Cadastro de equipamento monitorado"
         footer={<>
           <button className="btn ghost sm" onClick={() => setNovoAtivo(false)}>Cancelar</button>
-          <button className="btn primary sm" onClick={() => setNovoAtivo(false)}>Salvar</button>
+          <button className="btn primary sm" disabled={!nomeAtivo.trim()} onClick={salvarAtivo}>Salvar</button>
         </>}>
         <div className="form-row"><label className="lbl">Nome do ativo</label>
-          <input className="inp" placeholder="Ex: Câmara Fria 06" /></div>
+          <input className="inp" placeholder="Ex: Câmara Fria 06" value={nomeAtivo} onChange={(e) => setNomeAtivo(e.target.value)} /></div>
         <div className="form-row"><label className="lbl">Empresa</label>
-          <select className="inp">{D.sites.map((s) => <option key={s.id}>{s.name}</option>)}</select></div>
+          <select className="inp" value={empresaAtivo} onChange={(e) => setEmpresaAtivo(e.target.value)}>
+            {D.sites.map((s) => <option key={s.id}>{s.name}</option>)}
+          </select></div>
         <div className="form-row"><label className="lbl">Grupo</label>
-          <select className="inp">{D.grupos.map((g) => <option key={g.id}>{g.nome}</option>)}</select></div>
+          <select className="inp" value={grupoAtivo} onChange={(e) => setGrupoAtivo(e.target.value)}>
+            {D.grupos.map((g) => <option key={g.id}>{g.nome}</option>)}
+          </select></div>
       </Modal>
     </>
   );

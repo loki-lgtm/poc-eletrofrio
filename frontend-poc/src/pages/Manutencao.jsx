@@ -4,16 +4,36 @@ import { Topbar, PageHead, Kpi, Chip, SortTh, PrioPill, Pill, Modal } from '../c
 import { useTableFilter } from '../utils/useTableFilter';
 import * as D from '../utils/mockData';
 
+let proximaOsId = 3400;
+
 export function Manutencao() {
-  const { search, setSearch, chips, toggleChip, sort, toggleSort, filtered } = useTableFilter(D.manutencoes, {
+  const [manutencoes, setManutencoes] = useState(D.manutencoes);
+  const { search, setSearch, chips, toggleChip, sort, toggleSort, filtered } = useTableFilter(manutencoes, {
     searchFields: ['ativo', 'empresa', 'tecnico', 'id'],
   });
   const [agendar, setAgendar] = useState(false);
+  const [ativoAgendar, setAtivoAgendar] = useState(D.ativos[0]?.nome || '');
+  const [tipoAgendar, setTipoAgendar] = useState('Preventiva');
+  const [tecnicoAgendar, setTecnicoAgendar] = useState(D.tecnicos.find((t) => t !== '—') || '');
+  const [dataAgendar, setDataAgendar] = useState('');
 
-  const total = D.manutencoes.length;
-  const atrasadas = D.manutencoes.filter((m) => m.atraso).length;
-  const preventivas = D.manutencoes.filter((m) => m.tipo === 'Preventiva').length;
-  const corretivas = D.manutencoes.filter((m) => m.tipo === 'Corretiva').length;
+  const total = manutencoes.length;
+  const atrasadas = manutencoes.filter((m) => m.atraso).length;
+  const preventivas = manutencoes.filter((m) => m.tipo === 'Preventiva').length;
+  const corretivas = manutencoes.filter((m) => m.tipo === 'Corretiva').length;
+
+  const agendarManutencao = () => {
+    if (!ativoAgendar) return;
+    const ativo = D.ativos.find((a) => a.nome === ativoAgendar);
+    setManutencoes((prev) => [
+      {
+        id: 'MN-' + proximaOsId++, ativo: ativoAgendar, empresa: ativo?.empresa || '—', grupo: ativo?.grupo || '—',
+        tipo: tipoAgendar, tecnico: tecnicoAgendar, dataAgendada: dataAgendar || '—', atraso: false, prioridade: 'Normal',
+      },
+      ...prev,
+    ]);
+    setAgendar(false);
+  };
 
   return (
     <>
@@ -83,16 +103,22 @@ export function Manutencao() {
       <Modal open={agendar} onClose={() => setAgendar(false)} title="Agendar manutenção" sub="Nova ordem de serviço"
         footer={<>
           <button className="btn ghost sm" onClick={() => setAgendar(false)}>Cancelar</button>
-          <button className="btn primary sm" onClick={() => setAgendar(false)}>Agendar</button>
+          <button className="btn primary sm" onClick={agendarManutencao}>Agendar</button>
         </>}>
         <div className="form-row"><label className="lbl">Ativo</label>
-          <select className="inp">{D.ativos.map((a) => <option key={a.id}>{a.nome}</option>)}</select></div>
+          <select className="inp" value={ativoAgendar} onChange={(e) => setAtivoAgendar(e.target.value)}>
+            {D.ativos.map((a) => <option key={a.id}>{a.nome}</option>)}
+          </select></div>
         <div className="form-row"><label className="lbl">Tipo</label>
-          <select className="inp"><option>Preventiva</option><option>Corretiva</option></select></div>
+          <select className="inp" value={tipoAgendar} onChange={(e) => setTipoAgendar(e.target.value)}>
+            <option>Preventiva</option><option>Corretiva</option>
+          </select></div>
         <div className="form-row"><label className="lbl">Técnico</label>
-          <select className="inp">{D.tecnicos.filter((t) => t !== '—').map((t) => <option key={t}>{t}</option>)}</select></div>
+          <select className="inp" value={tecnicoAgendar} onChange={(e) => setTecnicoAgendar(e.target.value)}>
+            {D.tecnicos.filter((t) => t !== '—').map((t) => <option key={t}>{t}</option>)}
+          </select></div>
         <div className="form-row"><label className="lbl">Data</label>
-          <input className="inp" type="date" /></div>
+          <input className="inp" type="date" value={dataAgendar} onChange={(e) => setDataAgendar(e.target.value)} /></div>
       </Modal>
     </>
   );

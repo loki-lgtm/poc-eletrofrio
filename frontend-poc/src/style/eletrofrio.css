@@ -23,11 +23,11 @@
   --text-dim:      #475569;
   --text-faint:    #94a3b8;
 
-  /* Accent — blue */
-  --accent:        #2563eb;
+  /* Accent — Azul Eletrofrio (marca oficial) */
+  --accent:        #3d82f6;
   --accent-2:      #1d4ed8;
-  --accent-soft:   rgba(37, 99, 235, 0.09);
-  --accent-line:   rgba(37, 99, 235, 0.30);
+  --accent-soft:   rgba(61, 130, 246, 0.09);
+  --accent-line:   rgba(61, 130, 246, 0.30);
 
   /* Status */
   --green:      #16a34a;
@@ -36,8 +36,8 @@
   --red-soft:   rgba(220, 38, 38, 0.10);
   --amber:      #d97706;
   --amber-soft: rgba(217, 119, 6, 0.10);
-  --cyan:       #0891b2;
-  --cyan-soft:  rgba(8, 145, 178, 0.10);
+  --cyan:       #2bc4d8;
+  --cyan-soft:  rgba(43, 196, 216, 0.10);
   --purple:     #7c3aed;
   --purple-soft:rgba(124, 58, 237, 0.10);
 
@@ -53,6 +53,37 @@
 
   --sidebar-w: 248px;
   --topbar-h:  60px;
+
+  --scrollbar-thumb:       #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --surface-translucent:   rgba(255, 255, 255, 0.85);
+}
+
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+:root[data-theme="dark"] {
+  /* Surfaces — dark */
+  --bg:            #0a0f1a;
+  --surface:       #111927;
+  --surface-2:     #0d1420;
+  --surface-3:     #1b2434;
+  --hover:         rgba(255, 255, 255, 0.05);
+  --hover-strong:  rgba(255, 255, 255, 0.09);
+
+  /* Borders */
+  --border:        #1e293b;
+  --border-2:      #2c3a52;
+  --border-strong: #475569;
+
+  /* Text */
+  --text:          #f1f5f9;
+  --text-dim:      #aab4c5;
+  --text-faint:    #6b7892;
+
+  --scrollbar-thumb:       #334155;
+  --scrollbar-thumb-hover: #475569;
+  --surface-translucent:   rgba(17, 25, 39, 0.82);
 }
 
 * { box-sizing: border-box; }
@@ -78,10 +109,10 @@ body {
 /* Scrollbars */
 *::-webkit-scrollbar { width: 11px; height: 11px; }
 *::-webkit-scrollbar-thumb {
-  background: #cbd5e1; border-radius: 99px;
+  background: var(--scrollbar-thumb); border-radius: 99px;
   border: 3px solid transparent; background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); background-clip: content-box; }
 *::-webkit-scrollbar-track { background: transparent; }
 
 /* ============================================================
@@ -108,7 +139,7 @@ body {
 
 /* ---------- Sidebar ---------- */
 .sidebar {
-  background: #ffffff;
+  background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -131,7 +162,8 @@ body {
 }
 .sb-logo svg { width: 17px; height: 17px; }
 .sb-brand { display: flex; flex-direction: column; line-height: 1.15; flex: 1; min-width: 0; overflow: hidden; }
-.sb-brand b { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
+.sb-brand b { font-size: 14px; font-weight: 800; letter-spacing: -0.02em; }
+.sb-brand b .accent { color: var(--accent); }
 .sb-brand span { font-size: 10.5px; color: var(--text-faint); font-weight: 500; }
 
 .sb-burger {
@@ -214,7 +246,7 @@ body {
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 16px;
   padding: 0 24px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--surface-translucent);
   backdrop-filter: blur(8px);
 }
 .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-faint); }
@@ -260,10 +292,12 @@ body {
 
 .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 3px; gap: 2px; }
 .seg button {
+  display: inline-flex; align-items: center; gap: 6px;
   border: 0; background: transparent; color: var(--text-dim);
   font-family: var(--font-ui); font-size: 12.5px; font-weight: 600;
   padding: 5px 12px; border-radius: 5px; cursor: pointer; transition: .12s;
 }
+.seg button svg { width: 13px; height: 13px; }
 .seg button:hover { color: var(--text); }
 .seg button.on { background: var(--surface-3); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.3); }
 
@@ -426,6 +460,11 @@ body {
 .inp.mono { font-family: var(--font-mono); }
 textarea.inp { height: auto; padding: 9px 11px; resize: vertical; line-height: 1.5; }
 select.inp { appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+
+/* Lista nativa do <select> (popup de opções) — garante contraste em ambos os temas,
+   já que o navegador não herda var(--surface)/var(--text) automaticamente nas <option>. */
+select { background-color: var(--surface); color: var(--text); }
+option { background-color: var(--surface); color: var(--text); }
 
 .switch {
   width: 38px; height: 22px; border-radius: 99px; flex-shrink: 0;

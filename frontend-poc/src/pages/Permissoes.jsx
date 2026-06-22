@@ -7,7 +7,8 @@ import * as D from '../utils/mockData';
 const TODAS_PERMISSOES = ['Gestão de usuários', 'Configuração do sistema', 'Conexões e API', 'Relatórios', 'Operação de chamados', 'Telemetria', 'Gestão de ativos'];
 
 export function Permissoes() {
-  const { search, setSearch, sort, toggleSort, filtered } = useTableFilter(D.usuarios, {
+  const [usuarios, setUsuarios] = useState(D.usuarios);
+  const { search, setSearch, sort, toggleSort, filtered } = useTableFilter(usuarios, {
     searchFields: ['nome', 'email', 'funcao'],
   });
   const [matriz, setMatriz] = useState(() => {
@@ -24,8 +25,22 @@ export function Permissoes() {
     });
   };
 
-  const ativos = D.usuarios.filter((u) => u.status === 'Ativo').length;
+  const ativos = usuarios.filter((u) => u.status === 'Ativo').length;
   const [convidar, setConvidar] = useState(false);
+  const [nomeConvite, setNomeConvite] = useState('');
+  const [emailConvite, setEmailConvite] = useState('');
+  const [funcaoConvite, setFuncaoConvite] = useState(D.funcoes[0]);
+
+  const enviarConvite = () => {
+    if (!nomeConvite.trim() || !emailConvite.trim()) return;
+    setUsuarios((prev) => [
+      { nome: nomeConvite, email: emailConvite, funcao: funcaoConvite, status: 'Ativo', ultimoAcesso: 'convite enviado' },
+      ...prev,
+    ]);
+    setNomeConvite('');
+    setEmailConvite('');
+    setConvidar(false);
+  };
 
   return (
     <>
@@ -37,16 +52,16 @@ export function Permissoes() {
         <button className="btn primary" onClick={() => setConvidar(true)}><Icon name="plus" />Convidar usuário</button>
       </Topbar>
       <div className="scroll"><div className="page">
-        <PageHead title="Funções / Permissões" sub={`${D.usuarios.length} usuários · ${D.funcoes.length} funções`} />
+        <PageHead title="Funções / Permissões" sub={`${usuarios.length} usuários · ${D.funcoes.length} funções`} />
 
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))' }}>
-          <Kpi icon="users" label="Usuários" value={D.usuarios.length} />
+          <Kpi icon="users" label="Usuários" value={usuarios.length} />
           <Kpi icon="check" label="Ativos" value={ativos} accent="--green" />
           <Kpi icon="shield" label="Funções" value={D.funcoes.length} />
         </div>
 
         <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-h"><h3>Usuários</h3><span className="sub">{filtered.length} de {D.usuarios.length}</span></div>
+          <div className="card-h"><h3>Usuários</h3><span className="sub">{filtered.length} de {usuarios.length}</span></div>
           <div className="card-b flush" style={{ overflowX: 'auto' }}>
             <table className="tbl">
               <thead><tr>
@@ -99,14 +114,16 @@ export function Permissoes() {
       <Modal open={convidar} onClose={() => setConvidar(false)} title="Convidar usuário" sub="Envio de convite por e-mail"
         footer={<>
           <button className="btn ghost sm" onClick={() => setConvidar(false)}>Cancelar</button>
-          <button className="btn primary sm" onClick={() => setConvidar(false)}><Icon name="plus" size={13} />Enviar convite</button>
+          <button className="btn primary sm" disabled={!nomeConvite.trim() || !emailConvite.trim()} onClick={enviarConvite}><Icon name="plus" size={13} />Enviar convite</button>
         </>}>
         <div className="form-row"><label className="lbl">Nome</label>
-          <input className="inp" placeholder="Nome completo" /></div>
+          <input className="inp" placeholder="Nome completo" value={nomeConvite} onChange={(e) => setNomeConvite(e.target.value)} /></div>
         <div className="form-row"><label className="lbl">E-mail</label>
-          <input className="inp" type="email" placeholder="nome@empresa.com" /></div>
+          <input className="inp" type="email" placeholder="nome@empresa.com" value={emailConvite} onChange={(e) => setEmailConvite(e.target.value)} /></div>
         <div className="form-row"><label className="lbl">Função</label>
-          <select className="inp">{D.funcoes.map((f) => <option key={f}>{f}</option>)}</select></div>
+          <select className="inp" value={funcaoConvite} onChange={(e) => setFuncaoConvite(e.target.value)}>
+            {D.funcoes.map((f) => <option key={f}>{f}</option>)}
+          </select></div>
       </Modal>
     </>
   );

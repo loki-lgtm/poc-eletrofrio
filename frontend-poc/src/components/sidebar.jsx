@@ -47,10 +47,10 @@ export function Sidebar({ telaAtiva, setTelaAtiva }) {
     <aside className={'sidebar' + (collapsed ? ' collapsed' : '')}>
       <div className="sb-head">
         <div className="sb-logo">
-          <Icon name="snow" size={17} style={{ color: '#fff' }} />
+          <Icon name="brandmark" size={18} style={{ color: '#fff' }} />
         </div>
         <div className="sb-brand">
-          <b>Eletrofrio</b>
+          <b>Eletro<span className="accent">frio</span></b>
           <span>Monitoramento · IA</span>
         </div>
         <div className="sb-burger" onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>

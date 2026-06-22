@@ -23,12 +23,25 @@ export function PaginaInicial({ setTelaAtiva }) {
   const [modal, setModal] = useState(null);
   const [semTecnico, setSemTecnico] = useState(() => D.chamados.filter((c) => c.tecnico === '—').slice(0, 5));
   const [atrasadas, setAtrasadas] = useState(() => D.manutencoes.filter((m) => m.atraso));
+  const [novoTitulo, setNovoTitulo] = useState('');
+  const [novaEmpresa, setNovaEmpresa] = useState('');
+  const [novaPrioridade, setNovaPrioridade] = useState(D.prioridades[0]);
 
   const atribuir = (chamadoId, tecnico) => {
     setSemTecnico((prev) => prev.map((c) => (c.id === chamadoId ? { ...c, tecnico } : c)));
   };
   const confirmarAgendamento = (manutencaoId) => {
     setAtrasadas((prev) => prev.filter((m) => m.id !== manutencaoId));
+  };
+  const criarChamado = () => {
+    if (!novoTitulo.trim()) return;
+    setSemTecnico((prev) => [
+      { id: 'CH-' + Math.floor(Math.random() * 9000 + 1000), titulo: novoTitulo, emp: novaEmpresa || 'Não informado', eq: '—', tecnico: '—' },
+      ...prev,
+    ]);
+    setNovoTitulo('');
+    setNovaEmpresa('');
+    setModal(null);
   };
 
   const actionHandlers = [
@@ -92,7 +105,9 @@ export function PaginaInicial({ setTelaAtiva }) {
                 <Pill kind={a.tone}>{a.tag}</Pill>
               </div>
               <div className="row" style={{ alignItems: 'baseline', gap: 8, margin: '13px 0 2px' }}>
-                <span className="mono" style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-0.03em', color: `var(--${a.tone})` }}>{a.n}</span>
+                <span className="mono" style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-0.03em', color: `var(--${a.tone})` }}>
+                  {i === 1 ? semTecnico.length : i === 2 ? atrasadas.length : a.n}
+                </span>
                 <b style={{ fontSize: 14 }}>{a.title}</b>
               </div>
               <p className="muted" style={{ fontSize: 12.5, margin: '2px 0 15px' }}>{a.desc}</p>
@@ -171,14 +186,18 @@ export function PaginaInicial({ setTelaAtiva }) {
       <Modal open={modal === 'novo'} onClose={() => setModal(null)} title="Novo chamado" sub="Abertura manual de chamado"
         footer={<>
           <button className="btn ghost sm" onClick={() => setModal(null)}>Cancelar</button>
-          <button className="btn primary sm" onClick={() => setModal(null)}>Criar chamado</button>
+          <button className="btn primary sm" disabled={!novoTitulo.trim()} onClick={criarChamado}>Criar chamado</button>
         </>}>
         <div className="form-row"><label className="lbl">Título<span>Descreva o problema observado</span></label>
-          <input className="inp" placeholder="Ex: Temperatura fora do set point" /></div>
+          <input className="inp" placeholder="Ex: Temperatura fora do set point" value={novoTitulo} onChange={(e) => setNovoTitulo(e.target.value)} /></div>
         <div className="form-row"><label className="lbl">Empresa</label>
-          <select className="inp"><option value="">Selecione...</option>{D.sites.map((s) => <option key={s.id}>{s.name}</option>)}</select></div>
+          <select className="inp" value={novaEmpresa} onChange={(e) => setNovaEmpresa(e.target.value)}>
+            <option value="">Selecione...</option>{D.sites.map((s) => <option key={s.id}>{s.name}</option>)}
+          </select></div>
         <div className="form-row"><label className="lbl">Prioridade</label>
-          <select className="inp">{D.prioridades.map((p) => <option key={p}>{p}</option>)}</select></div>
+          <select className="inp" value={novaPrioridade} onChange={(e) => setNovaPrioridade(e.target.value)}>
+            {D.prioridades.map((p) => <option key={p}>{p}</option>)}
+          </select></div>
       </Modal>
 
       <Modal open={modal === 'tecnicos'} onClose={() => setModal(null)} title="Chamados sem responsável" sub={`${semTecnico.length} chamados aguardando atribuição`} width={560}

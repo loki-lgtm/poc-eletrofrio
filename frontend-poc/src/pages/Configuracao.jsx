@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Topbar, PageHead, Switch, Modal } from '../components/ui';
 import { useFilters, RANGES } from '../context/FiltersContext';
+import { useTheme } from '../context/ThemeContext';
 
 const SECTIONS = [
   { id: 'geral', label: 'Geral', icon: 'settings' },
@@ -13,6 +14,7 @@ const SECTIONS = [
 export function Configuracao() {
   const [secao, setSecao] = useState('geral');
   const { range, setRange, empresa, setEmpresa } = useFilters();
+  const { theme, setTheme } = useTheme();
   const [toggles, setToggles] = useState({
     whatsapp: true, email: true, chamadoAuto: true, rag: true, isolationForest: true,
   });
@@ -62,7 +64,12 @@ export function Configuracao() {
                 </div>
                 <div className="form-row">
                   <div className="lbl"><b>Tema</b><span>Aparência do painel</span></div>
-                  <div className="ctrl"><span className="tag">Escuro (padrão)</span></div>
+                  <div className="ctrl">
+                    <div className="seg">
+                      <button className={theme === 'light' ? 'on' : ''} onClick={() => setTheme('light')}><Icon name="sun" size={13} />Claro</button>
+                      <button className={theme === 'dark' ? 'on' : ''} onClick={() => setTheme('dark')}><Icon name="moon" size={13} />Escuro</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

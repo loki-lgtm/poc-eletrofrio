@@ -225,9 +225,9 @@ export function RelatoriosChamados() {
       <Modal open={modal === 'pdf'} onClose={() => setModal(null)} title="Exportar PDF" sub={`${rows.length} chamados no relatório`}
         footer={<>
           <button className="btn ghost sm" onClick={() => setModal(null)}>Cancelar</button>
-          <button className="btn primary sm" onClick={() => setModal(null)}><Icon name="file" size={13} />Gerar PDF</button>
+          <button className="btn primary sm" onClick={() => { setModal(null); window.print(); }}><Icon name="file" size={13} />Gerar PDF</button>
         </>}>
-        <p className="muted" style={{ fontSize: 12.5 }}>O relatório será gerado com os filtros e colunas atualmente aplicados e enviado para download.</p>
+        <p className="muted" style={{ fontSize: 12.5 }}>Abre a janela de impressão do navegador — escolha "Salvar como PDF" para gerar o arquivo com os filtros e colunas atualmente aplicados.</p>
       </Modal>
 
       <Modal open={modal === 'colunas'} onClose={() => setModal(null)} title="Colunas visíveis" sub="Detalhe de chamados"

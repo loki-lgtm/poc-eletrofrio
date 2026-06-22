@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { PaginaInicial } from './pages/PaginaInicial';
 import { FiltersProvider } from './context/FiltersContext';
+import { ThemeProvider } from './context/ThemeContext';
 import './style/App.css';
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
   }, [executarPipeline]);
 
   return (
+    <ThemeProvider>
     <FiltersProvider>
       <div className="app">
         <Sidebar telaAtiva={telaAtiva} setTelaAtiva={setTelaAtiva} />
@@ -94,6 +96,7 @@ function App() {
         </div>
       </div>
     </FiltersProvider>
+    </ThemeProvider>
   );
 }
 

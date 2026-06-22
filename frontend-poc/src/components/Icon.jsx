@@ -44,6 +44,10 @@ const ICON_PATHS = {
   play: '<path d="M7 5v14l11-7Z"/>',
   dot: '<circle cx="12" cy="12" r="3" fill="currentColor"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>',
+  // Símbolo da marca Eletrofrio: floco de seis braços (frio) + nó central sólido (monitoramento/dados)
+  brandmark: '<path d="M12 3v18"/><path d="M19.8 7.5 4.2 16.5"/><path d="M19.8 16.5 4.2 7.5"/><path d="M9 4 12 6 15 4"/><path d="M17.4 5.4 17.2 9 20.4 10.6"/><path d="M20.4 13.4 17.2 15 17.4 18.6"/><path d="M15 20 12 18 9 20"/><path d="M6.6 18.6 6.8 15 3.6 13.4"/><path d="M3.6 10.6 6.8 9 6.6 5.4"/><circle cx="12" cy="12" r="2.3" fill="currentColor" stroke="none"/>',
 };
 
 export function Icon({ name, size = 18, style, className, strokeWidth = 1.7 }) {
