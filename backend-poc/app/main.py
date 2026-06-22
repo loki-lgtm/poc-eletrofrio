@@ -20,7 +20,7 @@ from app.routers import dashboard, dispositivos, health, monitoramento, pipeline
 from app.services.monitoramento import monitoramento_background_preditivo
 
 
-'''@asynccontextmanager
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
 
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     yield
 
     if MONITORAMENTO_ATIVO:
-        scheduler.shutdown()'''
+        scheduler.shutdown()
 
 
 app = FastAPI(title="Motor Preditivo Eletrofrio - IA & IoT")
