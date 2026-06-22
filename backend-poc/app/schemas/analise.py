@@ -27,3 +27,8 @@ class AnaliseResponse(BaseModel):
     sazonalidade: Optional[str] = None
     risco_perda_rs: Optional[str] = None
     desperdicio_energia_rs: Optional[str] = None
+
+    eta_minutos: Optional[float] = None
+    tendencia_esforco: Optional[str] = None
+    codigo_alarme: Optional[str] = None
+    alarme_severidade: Optional[str] = None

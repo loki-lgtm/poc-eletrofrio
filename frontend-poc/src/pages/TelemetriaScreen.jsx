@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import { Icon } from '../components/Icon';
 import { Topbar, PageHead, Pill, Modal } from '../components/ui';
+import { AnaliseCardsPanel } from '../components/AnaliseCards';
 import { Histogram, VBars, Sparkline } from '../components/charts';
 import { useFilters, RANGES } from '../context/FiltersContext';
 import * as D from '../utils/mockData';
@@ -112,111 +113,78 @@ export function TelemetriaScreen({
           </div>
         )}
 
-        {/* KPI strip */}
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(4,minmax(0,1fr))', marginBottom: 16 }}>
-          <div className="card" style={{ padding: '13px 15px' }}>
-            <span className="faint" style={{ fontSize: 12 }}>Status da operação</span>
-            <div className="mono" style={{ fontSize: 20, fontWeight: 600, margin: '6px 0 2px', color: statusCor }}>
-              {analise?.status_operacao || '—'}
-            </div>
-            <span className="faint mono" style={{ fontSize: 11 }}>pipeline preditivo</span>
-          </div>
-          <div className="card" style={{ padding: '13px 15px' }}>
-            <span className="faint" style={{ fontSize: 12 }}>Horário do evento</span>
-            <div className="mono" style={{ fontSize: 24, fontWeight: 600, margin: '6px 0 2px', color: 'var(--cyan)' }}>
-              {analise?.horario_evento || '—'}
-            </div>
-            <span className="faint mono" style={{ fontSize: 11 }}>{analise?.sazonalidade || 'sazonalidade indisponível'}</span>
-          </div>
-          <div className="card" style={{ padding: '13px 15px' }}>
-            <span className="faint" style={{ fontSize: 12 }}>Risco de perda</span>
-            <div className="mono" style={{ fontSize: 22, fontWeight: 600, margin: '6px 0 2px', color: 'var(--red)' }}>
-              {analise?.risco_perda_rs || '—'}
-            </div>
-            <span className="faint mono" style={{ fontSize: 11 }}>mercadoria em risco</span>
-          </div>
-          <div className="card" style={{ padding: '13px 15px' }}>
-            <span className="faint" style={{ fontSize: 12 }}>Desperdício de energia</span>
-            <div className="mono" style={{ fontSize: 22, fontWeight: 600, margin: '6px 0 2px', color: 'var(--amber)' }}>
-              {analise?.desperdicio_energia_rs || '—'}
-            </div>
-            <span className="faint mono" style={{ fontSize: 11 }}>estimativa diária</span>
-          </div>
-        </div>
+        {/* painel de diagnóstico — cards configuráveis (mostrar/ocultar/reordenar) */}
+        <AnaliseCardsPanel analise={analise} loading={loading} critica={critica} />
 
-        {/* main time series + diagnostic */}
-        <div className="grid" style={{ gridTemplateColumns: 'minmax(0,1fr) 320px', marginBottom: 16 }}>
-          <div className="card">
-            <div className="card-h">
-              <h3>Série temporal — Temperatura</h3>
-              <span className="sub">Telemetria ao vivo · dispositivo {dispositivoId}</span>
-              <div className="legend" style={{ marginLeft: 'auto' }}>
-                <span><i style={{ background: 'var(--accent)' }} />Ambiente</span>
-                <span><i style={{ background: 'var(--cyan)' }} />Evaporador</span>
-                <span><i style={{ background: 'var(--text-faint)' }} />Setpoint</span>
+        {/* time series + diagnostic, agora no mesmo card, telemetria com largura total */}
+        <div className="card" style={{ marginBottom: 16, borderColor: critica ? 'rgba(240,85,107,.3)' : 'var(--border-2)' }}>
+          <div className="card-h">
+            <h3>Série temporal — Temperatura</h3>
+            <span className="sub">Telemetria ao vivo · dispositivo {dispositivoId}</span>
+            <div className="legend" style={{ marginLeft: 'auto' }}>
+              <span><i style={{ background: 'var(--accent)' }} />Ambiente</span>
+              <span><i style={{ background: 'var(--cyan)' }} />Evaporador</span>
+              <span><i style={{ background: 'var(--text-faint)' }} />Setpoint</span>
+            </div>
+          </div>
+          <div className="card-b">
+            {erroTelemetria && (
+              <span style={{ color: 'var(--red)', fontSize: 13 }}><Icon name="alert" size={14} /> {erroTelemetria}</span>
+            )}
+            {!erroTelemetria && loadingTelemetria && (
+              <span className="faint" style={{ fontStyle: 'italic' }}>Carregando telemetria…</span>
+            )}
+            {!erroTelemetria && !loadingTelemetria && (
+              <div style={{ height: 320 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={CHART_DATA}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="horario" stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                    <YAxis stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 8, color: 'var(--text)' }}
+                      itemStyle={{ color: 'var(--accent)' }}
+                    />
+                    {setpoint != null && (
+                      <ReferenceLine y={setpoint} stroke="var(--text-faint)" strokeDasharray="4 4" strokeWidth={1.2} />
+                    )}
+                    <Line name="Temp. Ambiente (°C)" type="monotone" dataKey="temp" stroke="var(--accent)" strokeWidth={2} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
+                    <Line name="Temp. Evaporador (°C)" type="monotone" dataKey="evap" stroke="var(--cyan)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                    {anomalyPoint && (
+                      <ReferenceDot x={anomalyPoint.horario} y={anomalyPoint.temp} r={6} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            </div>
-            <div className="card-b">
-              {erroTelemetria && (
-                <span style={{ color: 'var(--red)', fontSize: 13 }}><Icon name="alert" size={14} /> {erroTelemetria}</span>
-              )}
-              {!erroTelemetria && loadingTelemetria && (
-                <span className="faint" style={{ fontStyle: 'italic' }}>Carregando telemetria…</span>
-              )}
-              {!erroTelemetria && !loadingTelemetria && (
-                <div style={{ height: 272 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={CHART_DATA}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="horario" stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-                      <YAxis stroke="var(--text-faint)" tick={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 8, color: 'var(--text)' }}
-                        itemStyle={{ color: 'var(--accent)' }}
-                      />
-                      {setpoint != null && (
-                        <ReferenceLine y={setpoint} stroke="var(--text-faint)" strokeDasharray="4 4" strokeWidth={1.2} />
-                      )}
-                      <Line name="Temp. Ambiente (°C)" type="monotone" dataKey="temp" stroke="var(--accent)" strokeWidth={2} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
-                      <Line name="Temp. Evaporador (°C)" type="monotone" dataKey="evap" stroke="var(--cyan)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                      {anomalyPoint && (
-                        <ReferenceDot x={anomalyPoint.horario} y={anomalyPoint.temp} r={6} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
-          <div className="card" style={{ borderColor: critica ? 'rgba(240,85,107,.3)' : 'var(--border-2)' }}>
-            <div className="card-h" style={{ borderColor: critica ? 'rgba(240,85,107,.2)' : 'var(--border)' }}>
-              <span className="ic" style={{
-                width: 26, height: 26, borderRadius: 7, display: 'grid', placeItems: 'center',
-                background: critica ? 'var(--red-soft)' : 'var(--green-soft)', color: critica ? 'var(--red)' : 'var(--green)',
-              }}><Icon name="sparkles" size={15} /></span>
-              <h3>Diagnóstico IA</h3>
-              <span className={'pill ' + (critica ? 'red' : 'green')} style={{ marginLeft: 'auto' }}>
-                {loading ? '…' : (critica ? 'Crítico' : 'Estável')}
-              </span>
-            </div>
-            <div className="card-b" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {loading && <span className="faint" style={{ fontStyle: 'italic' }}>Analisando equipamento e manuais…</span>}
-              {!loading && analise && (
-                <>
-                  <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 8, padding: 12 }}>
-                    <span className="pill blue" style={{ marginBottom: 8 }}><Icon name="sparkles" size={11} />LlamaIndex AI</span>
-                    <p style={{ margin: '10px 0 0', lineHeight: 1.6, fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{analise.diagnostico_ia}</p>
-                  </div>
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <span className="faint" style={{ fontSize: 12 }}>Chamado técnico</span>
-                    {analise.chamado_aberto
-                      ? <Pill kind="red" dot>Aberto automaticamente</Pill>
-                      : <Pill kind="green" dot>Não necessário</Pill>}
-                  </div>
-                </>
-              )}
-            </div>
+          <div className="card-h" style={{ borderTop: '1px solid ' + (critica ? 'rgba(240,85,107,.2)' : 'var(--border)') }}>
+            <span className="ic" style={{
+              width: 26, height: 26, borderRadius: 7, display: 'grid', placeItems: 'center',
+              background: critica ? 'var(--red-soft)' : 'var(--green-soft)', color: critica ? 'var(--red)' : 'var(--green)',
+            }}><Icon name="sparkles" size={15} /></span>
+            <h3>Diagnóstico IA</h3>
+            <span className={'pill ' + (critica ? 'red' : 'green')} style={{ marginLeft: 'auto' }}>
+              {loading ? '…' : (critica ? 'Crítico' : 'Estável')}
+            </span>
+          </div>
+          <div className="card-b" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {loading && <span className="faint" style={{ fontStyle: 'italic' }}>Analisando equipamento e manuais…</span>}
+            {!loading && analise && (
+              <>
+                <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 8, padding: 12 }}>
+                  <span className="pill blue" style={{ marginBottom: 8 }}><Icon name="sparkles" size={11} />LlamaIndex AI</span>
+                  <p style={{ margin: '10px 0 0', lineHeight: 1.6, fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{analise.diagnostico_ia}</p>
+                </div>
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <span className="faint" style={{ fontSize: 12 }}>Chamado técnico</span>
+                  {analise.chamado_aberto
+                    ? <Pill kind="red" dot>Aberto automaticamente</Pill>
+                    : <Pill kind="green" dot>Não necessário</Pill>}
+                </div>
+              </>
+            )}
           </div>
         </div>
 

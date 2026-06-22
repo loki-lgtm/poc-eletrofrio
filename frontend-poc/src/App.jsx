@@ -61,7 +61,14 @@ function App() {
         <Sidebar telaAtiva={telaAtiva} setTelaAtiva={setTelaAtiva} />
 
         <div className="main">
-          {telaAtiva === 'home' && <PaginaInicial setTelaAtiva={setTelaAtiva} />}
+          {telaAtiva === 'home' && (
+            <PaginaInicial
+              setTelaAtiva={setTelaAtiva}
+              analise={analise}
+              loadingAnalise={loadingAnalise}
+              dispositivoId={dispositivoId}
+            />
+          )}
 
           {telaAtiva === 'relatorios' && <RelatoriosChamados />}
 

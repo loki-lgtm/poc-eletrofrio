@@ -1,6 +1,7 @@
 """Router: motor preditivo principal (coleta -> ML -> IA -> abertura de chamado)."""
 from fastapi import APIRouter, HTTPException
 
+from app.config import INTERVALO_MONITORAMENTO_MIN, JANELA_REGRESSAO_PONTOS
 from app.core.logging import logger
 from app.schemas.analise import AnaliseResponse
 from app.services.eletrofrio_api import (
@@ -8,6 +9,7 @@ from app.services.eletrofrio_api import (
     obter_contexto_dispositivo,
     post_abrir_chamado,
 )
+from app.services.eta import calcular_eta_falha
 from app.services.ia_diagnostico import ia_diagnostico_tecnico
 from app.services.ml import motor_isolation_forest
 from app.services.rag import montar_contexto_rag
@@ -55,6 +57,21 @@ async def executar_pipeline_preditivo(dispositivo_id: int):
         if horario_queda:
             diagnostico += f"\n\nALERTA: Controlador offline desde as {horario_queda}."
 
+        # ETA até o limite crítico (regressão linear sobre a janela recente) — mesma
+        # lógica do monitoramento em background, só que calculada sob-demanda aqui.
+        eta_minutos = None
+        tipo_equipamento = rag_contexto.get("tipo")
+        if tipo_equipamento and "Temperatura Ambiente" in df.columns:
+            resultado_eta = calcular_eta_falha(
+                df["Temperatura Ambiente"].tail(JANELA_REGRESSAO_PONTOS),
+                limite_critico=tipo_equipamento["set_point_temp_c"] + 5,
+                intervalo_minutos=INTERVALO_MONITORAMENTO_MIN,
+            )
+            if resultado_eta["eta_minutos"] != float("inf"):
+                eta_minutos = round(resultado_eta["eta_minutos"], 1)
+
+        alarme = rag_contexto.get("alarme")
+
         payload = {
             "equipe": "Time IA Preditiva",
             "lojaId": contexto["lojaId"],
@@ -77,6 +94,10 @@ async def executar_pipeline_preditivo(dispositivo_id: int):
             sazonalidade=sazonalidade_atual,
             risco_perda_rs=rag_contexto["risco"]["risco_mercadoria"],
             desperdicio_energia_rs=rag_contexto["risco"]["desperdicio_energia_dia"],
+            eta_minutos=eta_minutos,
+            tendencia_esforco=resultado_ml.get("tendencia_esforco"),
+            codigo_alarme=alarme["codigo"] if alarme else None,
+            alarme_severidade=alarme["severidade"] if alarme else None,
         )
 
     # CENÁRIO B: NÃO houve Anomalia Termodinâmica, mas a telemetria parou (ex: cabo rompido/sem luz)
