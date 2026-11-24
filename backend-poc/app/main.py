@@ -14,7 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import INTERVALO_MONITORAMENTO_MIN, MONITORAMENTO_ATIVO
+from app.config import CORS_ORIGINS, INTERVALO_MONITORAMENTO_MIN, MONITORAMENTO_ATIVO
 from app.core.logging import logger
 from app.routers import dashboard, dispositivos, health, monitoramento, pipeline, whatsapp
 from app.services.monitoramento import monitoramento_background_preditivo, registrar_scheduler_iniciado
@@ -49,9 +49,9 @@ app = FastAPI(title="Motor Preditivo Eletrofrio - IA & IoT", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(pipeline.router)

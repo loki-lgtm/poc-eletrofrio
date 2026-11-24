@@ -35,6 +35,15 @@ WHATSAPP_NUMEROS_PERMITIDOS = [
     n.strip() for n in os.getenv("WHATSAPP_NUMEROS_PERMITIDOS", "41985118423").split(",") if n.strip()
 ]
 
+# CORS — origens autorizadas a chamar a API pelo navegador (separadas por vírgula).
+# Padrão: o front local (Vite). Em produção, informe só o domínio real do front.
+# O curinga "*" é descartado de propósito; lista vazia bloqueia qualquer origem.
+CORS_ORIGINS = [
+    origem.strip()
+    for origem in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+    if origem.strip() and origem.strip() != "*"
+]
+
 # Base de conhecimento RAG (manuais técnicos, códigos de alarme, regras de decisão)
 RAG_KB_PATH = BASE_DIR / "data" / "manuais_tecnicos_rag.json"
 
